@@ -26,6 +26,7 @@ test('a config that extends both reports each broken rule of the fixture', () =>
     'unicorn(no-accessor-recursion)',
     'unicorn(no-array-fill-with-reference-type)',
     'typescript(no-unsafe-enum-comparison)',
+    'eslint(no-console)',
   ]) {
     assert.match(run.stdout, new RegExp(rule.replace(/[()]/g, '\\$&')), run.stdout + run.stderr);
   }
