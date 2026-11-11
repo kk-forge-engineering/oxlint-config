@@ -37,3 +37,4 @@ enum Kind {
   A = "a",
 }
 export const isA = (kind: string) => kind === Kind.A;
+console.log(isA("a"));

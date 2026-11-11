@@ -1,6 +1,6 @@
 {
   "name": "@kk-forge/oxlint-config",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "The oxlint rules KK Forge's TypeScript packages lint with",
   "license": "MIT",
   "author": "KK Forge",

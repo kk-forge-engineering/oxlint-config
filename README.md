@@ -2,7 +2,7 @@
 
 Shared oxlint configs for KK Forge's TypeScript packages.
 
-- `base.json`: the `correctness` category plus the bug-catching rules it lacks, type-aware, warnings fail.
+- `base.json`: the `correctness` category plus the bug-catching rules it lacks and `no-console`, type-aware, warnings fail. A package turns `no-console` off for its logger file.
 - `solid.json`: eslint-plugin-solid's recommended rules.
 
 ## Use
