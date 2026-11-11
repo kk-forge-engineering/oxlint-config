@@ -16,7 +16,19 @@
     "access": "public"
   },
   "scripts": {
+    "lint": "npm run lint:oxlint && npm run lint:format",
+    "lint:fix": "npm run lint:oxlint:fix && npm run lint:format:fix",
+    "lint:oxlint": "oxlint test/configs.test.mjs",
+    "lint:oxlint:fix": "oxlint --fix test/configs.test.mjs",
+    "lint:format": "oxfmt --check .",
+    "lint:format:fix": "oxfmt .",
     "test": "node --test"
+  },
+  "devDependencies": {
+    "eslint-plugin-solid": "^0.19.0",
+    "oxfmt": "^0.78.0",
+    "oxlint": "^1.93.0",
+    "oxlint-tsgolint": "^7.0.2006"
   },
   "peerDependencies": {
     "eslint-plugin-solid": "^0.18.0 || ^0.19.0",
@@ -27,10 +39,5 @@
     "eslint-plugin-solid": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "eslint-plugin-solid": "^0.19.0",
-    "oxlint": "^1.93.0",
-    "oxlint-tsgolint": "^7.0.2006"
   }
 }

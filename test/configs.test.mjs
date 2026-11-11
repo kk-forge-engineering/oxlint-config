@@ -6,7 +6,10 @@ import { test } from 'node:test';
 // So the run also shows that typeAware and denyWarnings reach it through extends, and that solid.json finds the
 // plugin from the package's folder.
 test('a config that extends both reports each broken rule of the fixture', () => {
-  const run = spawnSync('npx', ['oxlint', '--format', 'unix'], { cwd: new URL('fixtures', import.meta.url), encoding: 'utf8' });
+  const run = spawnSync('npx', ['oxlint', '--format', 'unix'], {
+    cwd: new URL('fixtures', import.meta.url),
+    encoding: 'utf8',
+  });
   assert.notEqual(run.status, 0, run.stdout + run.stderr);
   for (const rule of [
     'typescript(ban-ts-comment)',

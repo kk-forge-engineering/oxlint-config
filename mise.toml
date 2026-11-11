@@ -6,15 +6,29 @@ description = "Install the npm packages"
 run = "npm ci"
 
 [tasks.check]
-description = "The gate before a commit: the configs report each rule the fixture breaks"
-depends = ["test"]
+description = "The gate before a commit: every linter and the test"
+depends = ["lint", "test"]
 
 [tasks."check:ci"]
 description = "check as CI runs it"
-depends = ["test"]
+depends = ["lint", "test:ci"]
+
+[tasks.lint]
+description = "Every linter: oxlint through base.json, and format"
+run = "npm run lint"
+
+[tasks."lint:fix"]
+description = "Every linter's fix: oxlint and format"
+run = "npm run lint:fix"
 
 [tasks.test]
 description = "Lint the fixture through both configs"
+run = "npm test"
+
+# test:ci runs the same test and writes no coverage: the package holds two JSON files and no code, so SonarQube has
+# nothing to analyse and the repo has no sonar-project.properties.
+[tasks."test:ci"]
+description = "test as CI runs it"
 run = "npm test"
 
 # The Release workflow packs in a job apart from the checks. This install runs no dependency's scripts, so none of
