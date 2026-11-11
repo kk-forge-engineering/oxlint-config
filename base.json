@@ -1,0 +1,29 @@
+{
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "categories": {
+    "correctness": "error"
+  },
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-misused-promises": "error",
+    "prefer-const": ["error", { "ignoreReadBeforeAssign": true }],
+    "no-var": "error",
+    "import/no-cycle": "error",
+    "no-unmodified-loop-condition": "error",
+    "no-unexpected-multiline": "error",
+    "no-extend-native": "error",
+    "preserve-caught-error": "error",
+    "oxc/misrefactored-assign-op": "error",
+    "unicorn/require-post-message-target-origin": "error",
+    "unicorn/no-accessor-recursion": "error",
+    "unicorn/no-array-fill-with-reference-type": "error",
+    "typescript/no-unsafe-enum-comparison": "error"
+  }
+}

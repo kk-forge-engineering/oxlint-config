@@ -1,0 +1,8 @@
+name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  release:
+    uses: kk-forge-engineering/gh-actions/.github/workflows/release-npm.yml@v4
+    permissions: { contents: write, id-token: write }
