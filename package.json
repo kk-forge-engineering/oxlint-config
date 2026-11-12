@@ -11,7 +11,8 @@
   "files": [
     "base.json",
     "solid.json",
-    "slices.json"
+    "slices.json",
+    "slices.mjs"
   ],
   "publishConfig": {
     "access": "public"
@@ -19,8 +20,8 @@
   "scripts": {
     "lint": "npm run lint:oxlint && npm run lint:format",
     "lint:fix": "npm run lint:oxlint:fix && npm run lint:format:fix",
-    "lint:oxlint": "oxlint test/configs.test.mjs",
-    "lint:oxlint:fix": "oxlint --fix test/configs.test.mjs",
+    "lint:oxlint": "oxlint slices.mjs test/configs.test.mjs",
+    "lint:oxlint:fix": "oxlint --fix slices.mjs test/configs.test.mjs",
     "lint:format": "oxfmt --check .",
     "lint:format:fix": "oxfmt .",
     "test": "node --test test/configs.test.mjs"
