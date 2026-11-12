@@ -1,6 +1,6 @@
-// An oxlint JS plugin with one rule, `kk-forge/slices`: a file under src/ imports only the layers its own layer may
+// An oxlint JS plugin with one rule, `kk-forge/layers`: a file under src/ imports only the layers its own layer may
 // take, and reaches another module only through that module's surface file. `npm run build` compiles it to
-// dist/slices.js, the file slices.json loads.
+// dist/layers.js, the file layers.json loads.
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
@@ -150,6 +150,6 @@ const rule: CreateRule = {
   },
 };
 
-const plugin: Plugin = { meta: { name: "kk-forge" }, rules: { slices: rule } };
+const plugin: Plugin = { meta: { name: "kk-forge" }, rules: { layers: rule } };
 
 export default plugin;
