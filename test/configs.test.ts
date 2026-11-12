@@ -8,7 +8,7 @@ import { test } from "node:test";
 // oxlint runs with no flags in a folder whose config only extends base.json and solid.json, as a consumer's does.
 // So the run also shows that typeAware and denyWarnings reach it through extends, and that solid.json finds the
 // plugin from the package's folder.
-test("a config that extends both reports each broken rule of the fixture", () => {
+await test("a config that extends both reports each broken rule of the fixture", () => {
   const run = spawnSync("npx", ["oxlint", "--format", "unix"], {
     cwd: new URL("fixtures", import.meta.url),
     encoding: "utf8",
@@ -39,7 +39,7 @@ test("a config that extends both reports each broken rule of the fixture", () =>
 
 // Each file under test/slices/src named bad-* breaks one layer rule, and every other file follows them. The test
 // packs the package and lints through the unpacked tarball, so it runs the built plugin a consumer installs.
-test("slices.json reports each import that breaks the layers and nothing else", (context) => {
+await test("slices.json reports each import that breaks the layers and nothing else", (context) => {
   const packed = mkdtempSync(join(tmpdir(), "oxlint-config-"));
   context.after(() => rmSync(packed, { recursive: true, force: true }));
   const pack = spawnSync("npm", ["pack", "--silent", "--pack-destination", packed], {
@@ -58,7 +58,10 @@ test("slices.json reports each import that breaks the layers and nothing else", 
   const reported = [...run.stdout.matchAll(/^src\/(\S+?):\d+:/gm)]
     .map((match) => match[1])
     .toSorted((left, right) => left.localeCompare(right));
-  const broken = readdirSync(new URL("slices/src", import.meta.url), { recursive: true })
+  const broken = readdirSync(new URL("slices/src", import.meta.url), {
+    recursive: true,
+    encoding: "utf8",
+  })
     .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
     .toSorted((left, right) => left.localeCompare(right));
   assert.deepEqual(reported, broken, run.stdout + run.stderr);

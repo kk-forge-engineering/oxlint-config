@@ -19,16 +19,16 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "lint": "npm run lint:tsc && npm run lint:oxlint && npm run lint:format",
     "lint:fix": "npm run lint:oxlint:fix && npm run lint:format:fix",
-    "lint:tsc": "tsc --noEmit",
-    "lint:oxlint": "oxlint src test/configs.test.mjs",
-    "lint:oxlint:fix": "oxlint --fix src test/configs.test.mjs",
+    "lint:tsc": "tsc",
+    "lint:oxlint": "oxlint src test/configs.test.ts",
+    "lint:oxlint:fix": "oxlint --fix src test/configs.test.ts",
     "lint:format": "oxfmt --check .",
     "lint:format:fix": "oxfmt .",
-    "test": "node --test test/configs.test.mjs"
+    "test": "node --test test/configs.test.ts"
   },
   "devDependencies": {
     "@oxlint/plugins": "^1.93.0",

@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
     "module": "nodenext",
-    "outDir": "dist",
-    "rootDir": "src",
+    "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "test/*.ts"]
 }
