@@ -1,0 +1,13 @@
+{
+  "extends": [
+    "./node_modules/@kk-forge/oxlint-config/typescript.json",
+    "./node_modules/@kk-forge/oxlint-config/layers.json"
+  ],
+  "overrides": [
+    // WXT finds a folder entrypoint only by its index.ts, so these files keep the name and hold one line.
+    {
+      "files": ["src/entrypoints/*/index.ts"],
+      "rules": { "kk-forge/no-index-files": "off", "kk-forge/one-line-entry": "error" }
+    }
+  ]
+}

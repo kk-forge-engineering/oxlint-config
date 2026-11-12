@@ -1,4 +1,4 @@
 {
-  "jsPlugins": ["./dist/layers.js"],
+  "jsPlugins": ["./dist/plugin.js"],
   "rules": { "kk-forge/layers": "error" }
 }

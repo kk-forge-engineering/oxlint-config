@@ -1,6 +1,6 @@
 {
   "name": "@kk-forge/oxlint-config",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "The oxlint rules KK Forge's TypeScript packages lint with",
   "license": "MIT",
   "author": "KK Forge",
@@ -12,7 +12,7 @@
     "typescript.json",
     "solid.json",
     "layers.json",
-    "dist/layers.js"
+    "dist/*.js"
   ],
   "type": "module",
   "publishConfig": {
