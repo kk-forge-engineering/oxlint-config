@@ -29,10 +29,7 @@ function place(path) {
   return {
     layer,
     root: parts.slice(0, src + 1).join(sep),
-    module: parts
-      .slice(0, depth)
-      .join(sep)
-      .replace(/\.(js|ts|tsx)$/, ""),
+    module: parts.slice(0, depth).join(sep),
     name: parts[src + 2],
     inside: parts
       .slice(depth)
@@ -41,12 +38,16 @@ function place(path) {
   };
 }
 
-const isFolder = (path) => existsSync(path) && statSync(path).isDirectory();
+/** Returns the file a path names, trying it as written and then with .ts, .tsx and .js, as TypeScript does. */
+const fileAt = (path) =>
+  [path, `${path}.ts`, `${path}.tsx`, `${path}.js`].find(
+    (file) => existsSync(file) && statSync(file).isFile(),
+  );
 
 /** Returns why an import of module `to` breaks its surface, or undefined when it takes the surface it should. */
 function surfaceProblem(from, to) {
   // A shared module that is one file is its own surface. A folder, shared or not, is reached through its exports.ts.
-  if (to.layer === "shared" && to.inside === "" && !isFolder(to.module)) {
+  if (to.layer === "shared" && to.file) {
     return undefined;
   }
   if (from.layer !== "entrypoints") {
@@ -82,6 +83,12 @@ const rule = {
         ? join(from.root, specifier.slice(2))
         : resolve(dirname(context.filename), specifier);
       const to = place(target);
+      // An import that names a whole module may name a file module, which TypeScript finds before a folder.
+      const file = to?.inside === "" ? fileAt(to.module) : undefined;
+      if (to && file) {
+        to.module = file;
+        to.file = true;
+      }
       if (!to || to.module === from.module) {
         return;
       }

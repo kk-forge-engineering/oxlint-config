@@ -46,7 +46,7 @@ test("slices.json reports each import that breaks the layers and nothing else", 
     .map((match) => match[1])
     .toSorted((left, right) => left.localeCompare(right));
   const broken = readdirSync(new URL("slices/src", import.meta.url), { recursive: true })
-    .filter((file) => basename(file).startsWith("bad-"))
+    .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
     .toSorted((left, right) => left.localeCompare(right));
   assert.deepEqual(reported, broken, run.stdout + run.stderr);
 });
