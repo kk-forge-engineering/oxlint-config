@@ -1,1 +1,2 @@
-export const extract = 1;
+import { extract } from "../features/a/exports.extract";
+export { extract };

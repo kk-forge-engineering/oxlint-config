@@ -36,7 +36,7 @@ interface Place {
   root: string;
   /** The module's folder, or its file when the module is one file. */
   module: string;
-  /** The folder name under the layer, which names an entrypoint. */
+  /** The folder or file name under the layer without the file's extension, which names an entrypoint. */
   name: string | undefined;
   /** The path inside the module without its extension, empty for the module itself. */
   inside: string;
@@ -60,7 +60,7 @@ function place(path: string): Place | undefined {
     layer,
     root: parts.slice(0, src + 1).join(sep),
     module: parts.slice(0, depth).join(sep),
-    name: parts[src + 2],
+    name: parts.length === src + 3 ? parts[src + 2]?.replace(/\.[^.]*$/, "") : parts[src + 2],
     inside: parts
       .slice(depth)
       .join("/")
