@@ -1,5 +1,6 @@
 // The rule `kk-forge/layers`: a file under src/ imports only the layers its own layer may take, and reaches another
-// module only through that module's surface file.
+// module only through that module's surface file. A file in the tests/ folder beside src/ may import any layer, also
+// only through the module's surface file.
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
@@ -17,7 +18,15 @@ const allowed = {
 } as const satisfies Record<string, readonly string[]>;
 type Layer = keyof typeof allowed;
 
-const modular = new Set<Layer>(["entrypoints", "orchestration", "features", "entities", "shared"]);
+// A module is a folder directly under its layer, or a file directly under shared or infra.
+const modular = new Set<Layer>([
+  "entrypoints",
+  "orchestration",
+  "features",
+  "entities",
+  "shared",
+  "infra",
+]);
 // A shared module is one file, which is its own surface, or a folder with its own exports.ts.
 const published = new Set<Layer>(["orchestration", "features", "entities", "shared"]);
 
@@ -60,6 +69,17 @@ function place(path: string): Place | undefined {
   };
 }
 
+/** Returns the src/ folder beside the tests/ folder a path sits in, or undefined when the path is no test there. */
+function testedSource(path: string): string | undefined {
+  const parts = path.split(sep);
+  const tests = parts.lastIndexOf("tests");
+  if (tests < 0) {
+    return undefined;
+  }
+  const source = [...parts.slice(0, tests), "src"].join(sep);
+  return existsSync(source) ? source : undefined;
+}
+
 /**
  * Returns the file a path names, as TypeScript finds it: as written, then with .ts, .tsx or .js added, where a
  * written .js or .jsx also names the .ts or .tsx file beside it.
@@ -69,6 +89,29 @@ function fileAt(path: string): string | undefined {
   return [path, `${base}.ts`, `${base}.tsx`, `${base}.js`].find(
     (file) => existsSync(file) && statSync(file).isFile(),
   );
+}
+
+/** Returns why a test's import of module `to` breaks its surface, or undefined when it takes a surface. */
+function testProblem(to: Place): string | undefined {
+  // A test drives an entrypoint, which has no surface file. A shared or infra module that is one file is its own surface.
+  if (to.layer === "entrypoints" || ((to.layer === "shared" || to.layer === "infra") && to.file)) {
+    return undefined;
+  }
+  return /^exports(\.\w+)?$/.test(to.inside)
+    ? undefined
+    : "A test imports a module only through its exports.ts or exports.<entrypoint>.ts.";
+}
+
+/** Returns why a file under src/ may not import module `to`, or undefined when it may. */
+function memberProblem(from: Place, to: Place): string | undefined {
+  if (to.module === from.module) {
+    return undefined;
+  }
+  const allowedLayers: readonly Layer[] = allowed[from.layer];
+  if (!allowedLayers.includes(to.layer)) {
+    return `${from.layer} may not import ${to.layer}.`;
+  }
+  return published.has(to.layer) ? surfaceProblem(from, to) : undefined;
 }
 
 /** Returns why an import of module `to` breaks its surface, or undefined when it takes the surface it should. */
@@ -103,19 +146,22 @@ const rule: CreateRule = {
   },
   create(context: Context) {
     const from = place(context.filename);
+    // A file under src/ is a member of its module, a unit test beside its code included. A test in tests/ belongs to
+    // the src/ beside that folder.
+    const root = from ? from.root : testedSource(context.filename);
     const check = (node: ImportNode) => {
       const source = node.source;
-      if (!from || source?.type !== "Literal" || typeof source.value !== "string") {
+      if (root === undefined || source?.type !== "Literal" || typeof source.value !== "string") {
         return;
       }
       const specifier = source.value;
-      // Reads the aliases `@/` and `~/` as the importing file's src/, the folder the packages map them to.
+      // Reads the aliases `@/` and `~/` as `root`, the folder the packages map them to.
       const alias = /^[@~]\//.test(specifier);
       if (!alias && !specifier.startsWith(".")) {
         return;
       }
       const target = alias
-        ? join(from.root, specifier.slice(2))
+        ? join(root, specifier.slice(2))
         : resolve(dirname(context.filename), specifier);
       const to = place(target);
       if (!to) {
@@ -127,15 +173,7 @@ const rule: CreateRule = {
         to.module = file;
         to.file = true;
       }
-      if (to.module === from.module) {
-        return;
-      }
-      const allowedLayers: readonly Layer[] = allowed[from.layer];
-      const problem = !allowedLayers.includes(to.layer)
-        ? `${from.layer} may not import ${to.layer}.`
-        : published.has(to.layer)
-          ? surfaceProblem(from, to)
-          : undefined;
+      const problem = from ? memberProblem(from, to) : testProblem(to);
       if (problem) {
         context.report({ node, message: problem });
       }

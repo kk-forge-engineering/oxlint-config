@@ -67,7 +67,8 @@ await test("the packed package", async (packedPackage) => {
   assert.equal(pack.status, 0, pack.stderr);
   const tarball = join(packed, pack.stdout.trim().split("\n").at(-1) ?? "");
 
-  // Each file under test/layers/src named bad-* breaks one layer rule, and every other file follows them.
+  // Each file under test/layers/src or test/layers/tests named bad-* breaks one layer rule, and every other file follows
+  // them.
   await packedPackage.test(
     "layers.json reports each import that breaks the layers and nothing else",
     () => {
@@ -80,12 +81,15 @@ await test("the packed package", async (packedPackage) => {
         cwd: new URL("layers", import.meta.url),
         encoding: "utf8",
       });
-      const broken = readdirSync(new URL("layers/src", import.meta.url), {
-        recursive: true,
-        encoding: "utf8",
-      })
+      const broken = ["src", "tests"]
+        .flatMap((folder) =>
+          readdirSync(new URL(`layers/${folder}`, import.meta.url), {
+            recursive: true,
+            encoding: "utf8",
+          }).map((file) => `${folder}/${file}`),
+        )
         .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
-        .map((file) => `src/${file} kk-forge(layers)`)
+        .map((file) => `${file} kk-forge(layers)`)
         .toSorted((left, right) => left.localeCompare(right));
       assert.deepEqual(reports(run.stdout), broken, run.stdout + run.stderr);
     },
@@ -133,6 +137,7 @@ await test("the packed package", async (packedPackage) => {
           "src/features/a/bad-feature.ts kk-forge(layers)",
           "src/features/a/index.ts kk-forge(no-index-files)",
           "src/index.ts kk-forge(no-index-files)",
+          "tests/bad-deep.ts kk-forge(layers)",
         ],
         run.stdout + run.stderr,
       );
