@@ -69,15 +69,19 @@ function place(path: string): Place | undefined {
   };
 }
 
-/** Returns the src/ folder beside the tests/ folder a path sits in, or undefined when the path is no test there. */
+/**
+ * Returns the src/ folder beside the innermost tests/ folder of a path that has one beside it, or undefined when the
+ * path sits in no such tests/ folder.
+ */
 function testedSource(path: string): string | undefined {
   const parts = path.split(sep);
-  const tests = parts.lastIndexOf("tests");
-  if (tests < 0) {
-    return undefined;
+  for (let tests = parts.length - 2; tests >= 0; tests--) {
+    const source = [...parts.slice(0, tests), "src"].join(sep);
+    if (parts[tests] === "tests" && existsSync(source)) {
+      return source;
+    }
   }
-  const source = [...parts.slice(0, tests), "src"].join(sep);
-  return existsSync(source) ? source : undefined;
+  return undefined;
 }
 
 /**
@@ -91,13 +95,26 @@ function fileAt(path: string): string | undefined {
   );
 }
 
+/**
+ * Returns whether the path inside module `to` names a surface: its exports.ts, or an exports.<entrypoint>.ts whose
+ * entrypoint, a folder or a file, sits in the module's src/entrypoints.
+ */
+function isSurface(to: Place): boolean {
+  const entrypoint = /^exports\.([^/.][^/]*)$/.exec(to.inside)?.[1];
+  if (entrypoint === undefined) {
+    return to.inside === "exports";
+  }
+  const path = join(to.root, "entrypoints", entrypoint);
+  return existsSync(path) || fileAt(path) !== undefined;
+}
+
 /** Returns why a test's import of module `to` breaks its surface, or undefined when it takes a surface. */
 function testProblem(to: Place): string | undefined {
   // A test drives an entrypoint, which has no surface file. A shared or infra module that is one file is its own surface.
   if (to.layer === "entrypoints" || ((to.layer === "shared" || to.layer === "infra") && to.file)) {
     return undefined;
   }
-  return /^exports(\.\w+)?$/.test(to.inside)
+  return isSurface(to)
     ? undefined
     : "A test imports a module only through its exports.ts or exports.<entrypoint>.ts.";
 }
@@ -121,9 +138,7 @@ function surfaceProblem(from: Place, to: Place): string | undefined {
     return undefined;
   }
   if (from.layer !== "entrypoints") {
-    return /^exports(\.\w+)?$/.test(to.inside)
-      ? undefined
-      : "Import another module only through its exports.ts.";
+    return isSurface(to) ? undefined : "Import another module only through its exports.ts.";
   }
   // A module serves one entrypoint through exports.<entrypoint>.ts, and that entrypoint must take it.
   const own =
