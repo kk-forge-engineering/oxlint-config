@@ -16,7 +16,10 @@ A Solid package also installs `eslint-plugin-solid`. oxlint resolves `extends` f
 
 ```json
 {
-  "extends": ["./node_modules/@kk-forge/oxlint-config/base.json", "./node_modules/@kk-forge/oxlint-config/solid.json"]
+  "extends": [
+    "./node_modules/@kk-forge/oxlint-config/base.json",
+    "./node_modules/@kk-forge/oxlint-config/solid.json"
+  ]
 }
 ```
 
