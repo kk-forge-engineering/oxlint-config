@@ -6,33 +6,39 @@ description = "Install the npm packages"
 run = "npm ci"
 
 [tasks.check]
-description = "The gate before a commit: every linter and the test"
-depends = ["lint", "test"]
+description = "The gate before a commit: every linter, the build and the test"
+depends = ["lint", "build", "test"]
 
 [tasks."check:ci"]
 description = "check as CI runs it"
-depends = ["lint", "test:ci"]
+depends = ["lint", "build", "test:ci"]
 
 [tasks.lint]
-description = "Every linter: oxlint through base.json, and format"
+description = "Every linter: types, oxlint through base.json, and format"
 run = "npm run lint"
 
 [tasks."lint:fix"]
 description = "Every linter's fix: oxlint and format"
 run = "npm run lint:fix"
 
+[tasks.build]
+description = "Compile src/slices.ts into dist/slices.js"
+run = "npm run build"
+
+# The test packs the package, which builds it again, so it runs after build rather than beside it.
 [tasks.test]
-description = "Lint the fixture through both configs"
+description = "Lint the fixtures through the configs and the packed plugin"
+depends = ["build"]
 run = "npm test"
 
-# test:ci runs the same test and writes no coverage: the package holds two JSON files and no code, so SonarQube has
-# nothing to analyse and the repo has no sonar-project.properties.
+# test:ci runs the same test and writes no coverage, because the repo has no SonarQube project.
 [tasks."test:ci"]
 description = "test as CI runs it"
+depends = ["build"]
 run = "npm test"
 
 # The Release workflow packs in a job apart from the checks. This install runs no dependency's scripts, so none of
-# them runs where the tarball is made.
+# them runs where the tarball is made. npm pack builds dist/ in prepack.
 [tasks.pack]
 description = "Pack the package into the repo root, as the Release workflow publishes it"
 run = ["npm ci --ignore-scripts", "npm pack"]
