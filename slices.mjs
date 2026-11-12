@@ -1,6 +1,6 @@
 // An oxlint JS plugin with one rule, `kk-forge/slices`: a file under src/ imports only the layers its own layer may
 // take, and reaches another module of orchestration, features or entities only through that module's exports.ts.
-import { dirname, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 
 // The layers each layer may import. Only entrypoints imports infra, and infra takes entities and shared.
 const allowed = {
@@ -14,7 +14,7 @@ const allowed = {
 const modular = new Set(["entrypoints", "orchestration", "features", "entities"]);
 const published = new Set(["orchestration", "features", "entities"]);
 
-/** Returns the layer of a path under src/, its module folder and its path inside that module, or undefined. */
+/** Returns the layer of a path under src/, that src/, the module folder and the path inside it, or undefined. */
 function place(path) {
   const parts = path.split(sep);
   const src = parts.lastIndexOf("src");
@@ -23,7 +23,12 @@ function place(path) {
     return undefined;
   }
   const depth = modular.has(layer) ? src + 3 : src + 2;
-  return { layer, module: parts.slice(0, depth).join(sep), inside: parts.slice(depth).join("/") };
+  return {
+    layer,
+    root: parts.slice(0, src + 1).join(sep),
+    module: parts.slice(0, depth).join(sep),
+    inside: parts.slice(depth).join("/"),
+  };
 }
 
 const rule = {
@@ -35,10 +40,18 @@ const rule = {
     const from = place(context.filename);
     const check = (node) => {
       const specifier = node.source?.value;
-      if (!from || typeof specifier !== "string" || !specifier.startsWith(".")) {
+      if (!from || typeof specifier !== "string") {
         return;
       }
-      const to = place(resolve(dirname(context.filename), specifier));
+      // Reads the aliases `@/` and `~/` as the importing file's src/, the folder the packages map them to.
+      const alias = /^[@~]\//.test(specifier);
+      if (!alias && !specifier.startsWith(".")) {
+        return;
+      }
+      const target = alias
+        ? join(from.root, specifier.slice(2))
+        : resolve(dirname(context.filename), specifier);
+      const to = place(target);
       if (!to || to.module === from.module) {
         return;
       }
