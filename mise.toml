@@ -14,7 +14,7 @@ description = "check as CI runs it"
 depends = ["lint", "build", "test:ci"]
 
 [tasks.lint]
-description = "Every linter: types, oxlint through base.json, and format"
+description = "Every linter: types, oxlint through typescript.json, and format"
 run = "npm run lint"
 
 [tasks."lint:fix"]
@@ -22,7 +22,7 @@ description = "Every linter's fix: oxlint and format"
 run = "npm run lint:fix"
 
 [tasks.build]
-description = "Compile src/slices.ts into dist/slices.js"
+description = "Compile src/layers.ts into dist/layers.js"
 run = "npm run build"
 
 # The test packs the package, which builds it again, so it runs after build rather than beside it.
