@@ -1,18 +1,23 @@
 // An oxlint JS plugin with one rule, `kk-forge/slices`: a file under src/ imports only the layers its own layer may
-// take, and reaches another module of orchestration, features or entities only through that module's exports.ts.
+// take, and reaches another module of orchestration, features or entities only through that module's surface file.
+import { existsSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
-// The layers each layer may import. Only entrypoints imports infra, and infra takes entities and shared.
+// The layers each layer may import. A feature takes no other feature and an orchestration no other orchestration,
+// so they link through orchestration and entrypoints. Only entrypoints imports infra, which takes entities and shared.
 const allowed = {
   entrypoints: ["entrypoints", "orchestration", "features", "entities", "shared", "infra"],
-  orchestration: ["orchestration", "features", "entities", "shared"],
-  features: ["features", "entities", "shared"],
+  orchestration: ["features", "entities", "shared"],
+  features: ["entities", "shared"],
   entities: ["entities", "shared"],
   shared: ["shared"],
   infra: ["infra", "entities", "shared"],
 };
 const modular = new Set(["entrypoints", "orchestration", "features", "entities"]);
 const published = new Set(["orchestration", "features", "entities"]);
+// The runtime of an entrypoint folder that does not run as a page. A module serves a runtime through
+// exports.<runtime>.ts, and every page takes exports.ts.
+const runtimes = { background: "worker", content: "content", frameScroller: "frame" };
 
 /** Returns the layer of a path under src/, that src/, the module folder and the path inside it, or undefined. */
 function place(path) {
@@ -27,14 +32,33 @@ function place(path) {
     layer,
     root: parts.slice(0, src + 1).join(sep),
     module: parts.slice(0, depth).join(sep),
-    inside: parts.slice(depth).join("/"),
+    name: parts[src + 2],
+    inside: parts
+      .slice(depth)
+      .join("/")
+      .replace(/\.(js|ts|tsx)$/, ""),
   };
+}
+
+/** Returns why an import of module `to` breaks its surface, or undefined when it takes the surface it should. */
+function surfaceProblem(from, to) {
+  if (from.layer !== "entrypoints") {
+    return /^exports(\.\w+)?$/.test(to.inside)
+      ? undefined
+      : "Import another module only through its exports.ts.";
+  }
+  const runtime = runtimes[from.name];
+  const own =
+    runtime && existsSync(join(to.module, `exports.${runtime}.ts`))
+      ? `exports.${runtime}`
+      : "exports";
+  return to.inside === own ? undefined : `Import this module through its ${own}.ts.`;
 }
 
 const rule = {
   meta: {
     type: "problem",
-    docs: { description: "Keeps imports inside the layers and behind each module’s exports.ts" },
+    docs: { description: "Keeps imports inside the layers and behind each module’s surface file" },
   },
   create(context) {
     const from = place(context.filename);
@@ -55,10 +79,11 @@ const rule = {
       if (!to || to.module === from.module) {
         return;
       }
-      if (!allowed[from.layer].includes(to.layer)) {
-        context.report({ node, message: `${from.layer} may not import ${to.layer}.` });
-      } else if (published.has(to.layer) && to.inside.replace(/\.(js|ts|tsx)$/, "") !== "exports") {
-        context.report({ node, message: "Import another module only through its exports.ts." });
+      const problem = !allowed[from.layer].includes(to.layer)
+        ? `${from.layer} may not import ${to.layer}.`
+        : published.has(to.layer) && surfaceProblem(from, to);
+      if (problem) {
+        context.report({ node, message: problem });
       }
     };
     return {

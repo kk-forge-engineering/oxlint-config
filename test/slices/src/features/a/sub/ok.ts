@@ -1,3 +1,3 @@
-import { b } from "../../b/exports";
+import { user } from "../../../entities/user/exports";
 import { own } from "../own";
-export { b, own };
+export { user, own };
