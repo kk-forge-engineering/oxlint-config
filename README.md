@@ -25,6 +25,10 @@ A Solid package also installs `eslint-plugin-solid`. oxlint resolves `extends` f
 
 A package's own rules go below `extends` and win.
 
+## Development
+
+`mise run setup` installs the packages. `mise run check` type-checks, lints and formats, builds `src/slices.ts` into `dist/slices.js`, and runs the fixtures through the configs and the packed plugin.
+
 ## Release
 
 Raise `version` in package.json and merge to main. CI publishes to npm once the `production` environment approves.

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readdirSync } from "node:fs";
-import { basename } from "node:path";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { test } from "node:test";
 
 // oxlint runs with no flags in a folder whose config only extends base.json and solid.json, as a consumer's does.
@@ -36,9 +37,21 @@ test("a config that extends both reports each broken rule of the fixture", () =>
   assert.doesNotMatch(run.stdout, /Logger\.ts/, run.stdout);
 });
 
-// Each file under test/slices/src named bad-* breaks one layer rule, and every other file follows them.
-test("slices.json reports each import that breaks the layers and nothing else", () => {
-  const run = spawnSync("npx", ["oxlint", "--format", "unix"], {
+// Each file under test/slices/src named bad-* breaks one layer rule, and every other file follows them. The test
+// packs the package and lints through the unpacked tarball, so it runs the built plugin a consumer installs.
+test("slices.json reports each import that breaks the layers and nothing else", (context) => {
+  const packed = mkdtempSync(join(tmpdir(), "oxlint-config-"));
+  context.after(() => rmSync(packed, { recursive: true, force: true }));
+  const pack = spawnSync("npm", ["pack", "--silent", "--pack-destination", packed], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+  });
+  assert.equal(pack.status, 0, pack.stderr);
+  const tarball = join(packed, pack.stdout.trim().split("\n").at(-1) ?? "");
+  assert.equal(spawnSync("tar", ["-xzf", tarball, "-C", packed]).status, 0);
+  const config = join(packed, "consumer.json");
+  writeFileSync(config, JSON.stringify({ extends: ["./package/slices.json"] }));
+  const run = spawnSync("npx", ["oxlint", "-c", config, "--format", "unix"], {
     cwd: new URL("slices", import.meta.url),
     encoding: "utf8",
   });

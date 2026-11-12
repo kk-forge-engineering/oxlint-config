@@ -12,25 +12,32 @@
     "base.json",
     "solid.json",
     "slices.json",
-    "slices.mjs"
+    "dist/slices.js"
   ],
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "lint": "npm run lint:oxlint && npm run lint:format",
+    "build": "tsc",
+    "prepack": "npm run build",
+    "lint": "npm run lint:tsc && npm run lint:oxlint && npm run lint:format",
     "lint:fix": "npm run lint:oxlint:fix && npm run lint:format:fix",
-    "lint:oxlint": "oxlint slices.mjs test/configs.test.mjs",
-    "lint:oxlint:fix": "oxlint --fix slices.mjs test/configs.test.mjs",
+    "lint:tsc": "tsc --noEmit",
+    "lint:oxlint": "oxlint src test/configs.test.mjs",
+    "lint:oxlint:fix": "oxlint --fix src test/configs.test.mjs",
     "lint:format": "oxfmt --check .",
     "lint:format:fix": "oxfmt .",
     "test": "node --test test/configs.test.mjs"
   },
   "devDependencies": {
+    "@oxlint/plugins": "^1.93.0",
+    "@types/node": "^26.6.6",
     "eslint-plugin-solid": "^0.19.0",
     "oxfmt": "^0.78.0",
     "oxlint": "^1.93.0",
-    "oxlint-tsgolint": "^7.0.2006"
+    "oxlint-tsgolint": "^7.0.2006",
+    "typescript": "^7.0.2"
   },
   "peerDependencies": {
     "eslint-plugin-solid": "^0.18.0 || ^0.19.0",

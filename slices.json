@@ -1,4 +1,4 @@
 {
-  "jsPlugins": ["./slices.mjs"],
+  "jsPlugins": ["./dist/slices.js"],
   "rules": { "kk-forge/slices": "error" }
 }
