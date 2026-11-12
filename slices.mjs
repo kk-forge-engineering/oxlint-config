@@ -15,9 +15,6 @@ const allowed = {
 };
 const modular = new Set(["entrypoints", "orchestration", "features", "entities"]);
 const published = new Set(["orchestration", "features", "entities"]);
-// The runtime of an entrypoint folder that does not run as a page. A module serves a runtime through
-// exports.<runtime>.ts, and every page takes exports.ts.
-const runtimes = { background: "worker", content: "content", frameScroller: "frame" };
 
 /** Returns the layer of a path under src/, that src/, the module folder and the path inside it, or undefined. */
 function place(path) {
@@ -47,11 +44,10 @@ function surfaceProblem(from, to) {
       ? undefined
       : "Import another module only through its exports.ts.";
   }
-  const runtime = runtimes[from.name];
-  const own =
-    runtime && existsSync(join(to.module, `exports.${runtime}.ts`))
-      ? `exports.${runtime}`
-      : "exports";
+  // A module serves one entrypoint through exports.<entrypoint>.ts, and that entrypoint must take it.
+  const own = existsSync(join(to.module, `exports.${from.name}.ts`))
+    ? `exports.${from.name}`
+    : "exports";
   return to.inside === own ? undefined : `Import this module through its ${own}.ts.`;
 }
 
