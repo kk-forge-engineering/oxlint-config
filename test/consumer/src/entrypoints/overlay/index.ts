@@ -5,6 +5,7 @@ export default defineContentScript({
   matches: [`*://example.com/*`],
   cssInjectionMode: "ui",
   allFrames: false,
+  zIndex: -1,
   main(ctx) {
     mountOverlay(ctx);
   },

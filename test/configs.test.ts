@@ -38,20 +38,32 @@ await test("a config that extends both reports each broken rule of the fixture",
   assert.doesNotMatch(run.stdout, /Logger\.ts/, run.stdout);
 });
 
-/** Returns each `<path> <rule>` an oxlint run reports, sorted. */
-const reports = (stdout: string) =>
-  [...stdout.matchAll(/^(\S+?):\d+:\d+: .* \[\w+\/(\S+)\]$/gm)]
-    .map((match) => `${match[1]} ${match[2]}`)
-    .toSorted((left, right) => left.localeCompare(right));
+/**
+ * Returns each `<path> <rule>` an oxlint run reports, sorted. It first checks that the run's problem total counts only
+ * those, so a problem with no rule, such as a fixture that fails to parse, fails the test.
+ */
+function reports(stdout: string): string[] {
+  const tagged = [...stdout.matchAll(/^(\S+?):\d+:\d+: .* \[\w+\/(\S+)\]$/gm)].map(
+    (match) => `${match[1]} ${match[2]}`,
+  );
+  assert.equal(Number(/^(\d+) problems?$/m.exec(stdout)?.[1] ?? 0), tagged.length, stdout);
+  return tagged.toSorted((left, right) => left.localeCompare(right));
+}
 
 // The tests pack the package as npm publishes it, so they lint through the built plugin a consumer installs.
 await test("the packed package", async (packedPackage) => {
   const packed = mkdtempSync(join(tmpdir(), "oxlint-config-"));
   packedPackage.after(() => rmSync(packed, { recursive: true, force: true }));
-  const pack = spawnSync("npm", ["pack", "--silent", "--pack-destination", packed], {
-    cwd: new URL("..", import.meta.url),
-    encoding: "utf8",
-  });
+  // The test skips prepack's build, which `mise run test` has run already, so it rewrites no dist/ file that a parallel
+  // `mise run lint` is loading.
+  const pack = spawnSync(
+    "npm",
+    ["pack", "--silent", "--ignore-scripts", "--pack-destination", packed],
+    {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8",
+    },
+  );
   assert.equal(pack.status, 0, pack.stderr);
   const tarball = join(packed, pack.stdout.trim().split("\n").at(-1) ?? "");
 
@@ -105,9 +117,16 @@ await test("the packed package", async (packedPackage) => {
         reports(run.stdout),
         [
           "src/entrypoints/bad-call-option/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-default-parameter/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-generator/index.ts eslint(require-yield)",
+          "src/entrypoints/bad-generator/index.ts kk-forge(one-line-entry)",
           "src/entrypoints/bad-identifier-option/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-iife/index.ts kk-forge(one-line-entry)",
           "src/entrypoints/bad-logic/index.ts kk-forge(one-line-entry)",
           "src/entrypoints/bad-main-argument/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-nested-arrow/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-nested-call/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-then/index.ts kk-forge(one-line-entry)",
           "src/entrypoints/bad-two-calls/index.ts kk-forge(one-line-entry)",
           "src/entrypoints/bad-two-functions/index.ts kk-forge(one-line-entry)",
           "src/entrypoints/bad-two/index.ts kk-forge(one-line-entry)",

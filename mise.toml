@@ -25,10 +25,10 @@ depends = ["build"]
 run = "npm run lint:fix"
 
 [tasks.build]
-description = "Compile src/layers.ts into dist/layers.js"
+description = "Compile the plugin in src/ into dist/"
 run = "npm run build"
 
-# The test packs the package, which builds it again, so it runs after build rather than beside it.
+# The test packs the package without building it, so it runs after build, which it takes dist/ from.
 [tasks.test]
 description = "Lint the fixtures through the configs and the packed plugin"
 depends = ["build"]

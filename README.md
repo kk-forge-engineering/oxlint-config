@@ -42,11 +42,13 @@ A framework may require a file by name, such as WXT's `entrypoints/<name>/index.
 }
 ```
 
-`kk-forge/one-line-entry` allows imports and one line, which keeps the logic in the `start…()` or `mount…()` the line calls. The line is one of these:
+`kk-forge/one-line-entry` allows imports and one line, which keeps the logic in the `start…()` or `mount…()` the line calls. Each form below holds one call: a named function called with identifiers, literals or property reads such as `ctx.signal`, which may stand under `void` or `await`. The line is one of these:
 
-- A bare call such as `startPopup()`, which may stand under `void` or `await`.
-- The framework's definition around an arrow whose body is one call: `export default defineBackground(() => startBackground())`.
-- The framework's definition around an options object: `export default defineContentScript({ matches: ["*://*/*"], main: (ctx) => mountOverlay(ctx) })`. One property is a function whose body is one call, and that call takes only identifiers and literals. Every other property holds a string, number, boolean, `null`, a template without expressions, or an array or object of these.
+- The call itself, such as `startPopup()`.
+- The framework's definition around an arrow: `export default defineBackground(() => startBackground())`. The arrow's body is the call or a block that holds only the call, as in `async () => { await startBackground(); }`.
+- The framework's definition around an options object: `export default defineContentScript({ matches: ["*://*/*"], main: (ctx) => mountOverlay(ctx) })`. One property is a function, written as an arrow, a method or `function`, whose body is the call or a block that holds only the call. Every other property holds a string, a number, a negative number, a boolean, `null`, a template without expressions, or an array or object of these.
+
+In both definitions the function's parameters are plain names, with no defaults.
 
 ## Development
 

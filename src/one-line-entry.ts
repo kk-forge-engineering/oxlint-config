@@ -5,33 +5,63 @@ import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
 type Statement = ESTree.Program["body"][number];
 type Property = ESTree.ObjectExpression["properties"][number];
+type Callable = ESTree.ArrowFunctionExpression | ESTree.Function;
 
-const isCall = (node: ESTree.Node | null): node is ESTree.CallExpression =>
-  node?.type === "CallExpression";
-
-const isFunction = (node: ESTree.Node): node is ESTree.ArrowFunctionExpression | ESTree.Function =>
+const isFunction = (node: ESTree.Node): node is Callable =>
   node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression";
 
-/** Returns the one call a function body holds, as the body itself or as a block's only statement. */
-function onlyCall(
-  body: ESTree.ArrowFunctionExpression["body"] | ESTree.Function["body"],
-): ESTree.CallExpression | undefined {
-  if (!body) {
-    return undefined;
+/** Returns whether an argument is an identifier, a literal, or a chain of plain property reads such as `ctx.signal`. */
+function isPlainArgument(node: ESTree.CallExpression["arguments"][number]): boolean {
+  if (node.type === "MemberExpression") {
+    return !node.computed && isPlainArgument(node.object);
   }
-  if (body.type !== "BlockStatement") {
-    return isCall(body) ? body : undefined;
-  }
-  const [only, ...rest] = body.body;
-  return rest.length === 0 && only?.type === "ExpressionStatement" && isCall(only.expression)
-    ? only.expression
-    : undefined;
+  return node.type === "Identifier" || node.type === "Literal";
 }
 
-/** Returns whether a value is a literal, a template without expressions, or an array or object built of them. */
+/**
+ * Returns whether an expression is one call of a named function on plain arguments. The call may stand under `void`
+ * or `await`, so a call that returns a promise is not left floating.
+ */
+function isOneCall(node: ESTree.Expression): boolean {
+  const call =
+    (node.type === "UnaryExpression" && node.operator === "void") || node.type === "AwaitExpression"
+      ? node.argument
+      : node;
+  return (
+    call.type === "CallExpression" &&
+    call.callee.type === "Identifier" &&
+    call.arguments.every(isPlainArgument)
+  );
+}
+
+/** Returns whether a function takes plain parameters and its body is one call, as the body or its only statement. */
+function isOneCallFunction(callable: Callable): boolean {
+  const body = callable.body;
+  if (
+    callable.generator ||
+    !callable.params.every((param) => param.type === "Identifier") ||
+    !body
+  ) {
+    return false;
+  }
+  if (body.type !== "BlockStatement") {
+    return isOneCall(body);
+  }
+  const [only, ...rest] = body.body;
+  return rest.length === 0 && only?.type === "ExpressionStatement" && isOneCall(only.expression);
+}
+
+/** Returns whether a value is a literal, a negative number, a template without expressions, or an array or object of them. */
 function isLiteralValue(node: ESTree.ArrayExpression["elements"][number]): boolean {
   if (node?.type === "Literal") {
     return !("regex" in node) && typeof node.value !== "bigint";
+  }
+  if (node?.type === "UnaryExpression") {
+    return (
+      node.operator === "-" &&
+      node.argument.type === "Literal" &&
+      typeof node.argument.value === "number"
+    );
   }
   if (node?.type === "TemplateLiteral") {
     return node.expressions.length === 0;
@@ -50,61 +80,40 @@ const isOption = (property: Property): boolean =>
   !property.method &&
   isLiteralValue(property.value);
 
-/** Returns whether a property is a function, by arrow, method or `function`, that passes its parameters to one call. */
-function isMain(property: Property): boolean {
-  if (
-    property.type !== "Property" ||
-    property.computed ||
-    property.kind !== "init" ||
-    !isFunction(property.value)
-  ) {
-    return false;
-  }
-  const call = onlyCall(property.value.body);
+/** Returns whether a definition's options are literal values beside exactly one function, `main`, of one call. */
+function isDefinitionOptions(options: ESTree.ObjectExpression): boolean {
+  const [main, ...rest] = options.properties.filter((property) => !isOption(property));
   return (
-    property.value.params.every((param) => param.type === "Identifier") &&
-    call?.callee.type === "Identifier" &&
-    call.arguments.every(
-      (argument) => argument.type === "Identifier" || argument.type === "Literal",
-    )
+    rest.length === 0 &&
+    main?.type === "Property" &&
+    !main.computed &&
+    main.kind === "init" &&
+    isFunction(main.value) &&
+    isOneCallFunction(main.value)
   );
 }
 
-/** Returns whether a definition's options are literal values beside exactly one function, `main`. */
-function isDefinitionOptions(options: ESTree.ObjectExpression): boolean {
-  const [main, ...rest] = options.properties.filter((property) => !isOption(property));
-  return main !== undefined && rest.length === 0 && isMain(main);
-}
-
-/**
- * Returns whether a statement is the one line: a framework definition around an arrow or an options object, or a bare
- * call. A bare call may stand under `void` or `await`, so a call that returns a promise is not left floating.
- */
+/** Returns whether a statement is the one line: a framework definition around an arrow or an options object, or a bare call. */
 function isEntryLine(statement: Statement): boolean {
-  if (statement.type === "ExportDefaultDeclaration") {
-    const definition = statement.declaration;
-    if (
-      !isCall(definition) ||
-      definition.callee.type !== "Identifier" ||
-      definition.arguments.length !== 1
-    ) {
-      return false;
-    }
-    const [argument] = definition.arguments;
-    return argument?.type === "ArrowFunctionExpression"
-      ? onlyCall(argument.body) !== undefined
-      : argument?.type === "ObjectExpression" && isDefinitionOptions(argument);
+  if (statement.type === "ExpressionStatement") {
+    return isOneCall(statement.expression);
   }
-  if (statement.type !== "ExpressionStatement") {
+  if (statement.type !== "ExportDefaultDeclaration") {
     return false;
   }
-  const expression = statement.expression;
-  const unwrapped =
-    (expression.type === "UnaryExpression" && expression.operator === "void") ||
-    expression.type === "AwaitExpression"
-      ? expression.argument
-      : expression;
-  return isCall(unwrapped);
+  const definition = statement.declaration;
+  if (
+    definition.type !== "CallExpression" ||
+    definition.callee.type !== "Identifier" ||
+    definition.arguments.length !== 1
+  ) {
+    return false;
+  }
+  const [argument] = definition.arguments;
+  if (argument?.type === "ArrowFunctionExpression") {
+    return isOneCallFunction(argument);
+  }
+  return argument?.type === "ObjectExpression" && isDefinitionOptions(argument);
 }
 
 const rule: CreateRule = {
