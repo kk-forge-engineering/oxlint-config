@@ -13,12 +13,15 @@ depends = ["lint", "build", "test"]
 description = "check as CI runs it"
 depends = ["lint", "build", "test:ci"]
 
+# typescript.json loads the plugin from dist/, so oxlint runs after build.
 [tasks.lint]
 description = "Every linter: types, oxlint through typescript.json, and format"
+depends = ["build"]
 run = "npm run lint"
 
 [tasks."lint:fix"]
 description = "Every linter's fix: oxlint and format"
+depends = ["build"]
 run = "npm run lint:fix"
 
 [tasks.build]

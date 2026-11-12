@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 // oxlint runs with no flags in a folder whose config only extends typescript.json and solid.json, as a consumer's does.
 // So the run also shows that typeAware and denyWarnings reach it through extends, and that solid.json finds the
@@ -37,32 +38,85 @@ await test("a config that extends both reports each broken rule of the fixture",
   assert.doesNotMatch(run.stdout, /Logger\.ts/, run.stdout);
 });
 
-// Each file under test/layers/src named bad-* breaks one layer rule, and every other file follows them. The test
-// packs the package and lints through the unpacked tarball, so it runs the built plugin a consumer installs.
-await test("layers.json reports each import that breaks the layers and nothing else", (context) => {
+/** Returns each `<path> <rule>` an oxlint run reports, sorted. */
+const reports = (stdout: string) =>
+  [...stdout.matchAll(/^(\S+?):\d+:\d+: .* \[\w+\/(\S+)\]$/gm)]
+    .map((match) => `${match[1]} ${match[2]}`)
+    .toSorted((left, right) => left.localeCompare(right));
+
+// The tests pack the package as npm publishes it, so they lint through the built plugin a consumer installs.
+await test("the packed package", async (packedPackage) => {
   const packed = mkdtempSync(join(tmpdir(), "oxlint-config-"));
-  context.after(() => rmSync(packed, { recursive: true, force: true }));
+  packedPackage.after(() => rmSync(packed, { recursive: true, force: true }));
   const pack = spawnSync("npm", ["pack", "--silent", "--pack-destination", packed], {
     cwd: new URL("..", import.meta.url),
     encoding: "utf8",
   });
   assert.equal(pack.status, 0, pack.stderr);
   const tarball = join(packed, pack.stdout.trim().split("\n").at(-1) ?? "");
-  assert.equal(spawnSync("tar", ["-xzf", tarball, "-C", packed]).status, 0);
-  const config = join(packed, "consumer.json");
-  writeFileSync(config, JSON.stringify({ extends: ["./package/layers.json"] }));
-  const run = spawnSync("npx", ["oxlint", "-c", config, "--format", "unix"], {
-    cwd: new URL("layers", import.meta.url),
-    encoding: "utf8",
-  });
-  const reported = [...run.stdout.matchAll(/^src\/(\S+?):\d+:/gm)]
-    .map((match) => match[1])
-    .toSorted((left, right) => left.localeCompare(right));
-  const broken = readdirSync(new URL("layers/src", import.meta.url), {
-    recursive: true,
-    encoding: "utf8",
-  })
-    .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
-    .toSorted((left, right) => left.localeCompare(right));
-  assert.deepEqual(reported, broken, run.stdout + run.stderr);
+
+  // Each file under test/layers/src named bad-* breaks one layer rule, and every other file follows them.
+  await packedPackage.test(
+    "layers.json reports each import that breaks the layers and nothing else",
+    () => {
+      const unpacked = join(packed, "layers");
+      mkdirSync(unpacked);
+      assert.equal(spawnSync("tar", ["-xzf", tarball, "-C", unpacked]).status, 0);
+      const config = join(unpacked, "consumer.json");
+      writeFileSync(config, JSON.stringify({ extends: ["./package/layers.json"] }));
+      const run = spawnSync("npx", ["oxlint", "-c", config, "--format", "unix"], {
+        cwd: new URL("layers", import.meta.url),
+        encoding: "utf8",
+      });
+      const broken = readdirSync(new URL("layers/src", import.meta.url), {
+        recursive: true,
+        encoding: "utf8",
+      })
+        .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
+        .map((file) => `src/${file} kk-forge(layers)`)
+        .toSorted((left, right) => left.localeCompare(right));
+      assert.deepEqual(reports(run.stdout), broken, run.stdout + run.stderr);
+    },
+  );
+
+  // test/consumer is an app that installs the package and extends typescript.json and layers.json, which both load the
+  // plugin. Its .oxlintrc.json, comment included, turns one-line-entry on for its WXT entrypoints and no-index-files off.
+  await packedPackage.test(
+    "a consumer's override turns one-line-entry on and no-index-files off for its entrypoints",
+    (context) => {
+      const installed = new URL("consumer/node_modules/@kk-forge/oxlint-config", import.meta.url);
+      context.after(() =>
+        rmSync(new URL("consumer/node_modules", import.meta.url), { recursive: true, force: true }),
+      );
+      mkdirSync(installed, { recursive: true });
+      const untar = spawnSync(
+        "tar",
+        ["-xzf", tarball, "-C", fileURLToPath(installed), "--strip-components=1"],
+        {
+          encoding: "utf8",
+        },
+      );
+      assert.equal(untar.status, 0, untar.stderr);
+      const run = spawnSync("npx", ["oxlint", "--format", "unix"], {
+        cwd: new URL("consumer", import.meta.url),
+        encoding: "utf8",
+      });
+      assert.deepEqual(
+        reports(run.stdout),
+        [
+          "src/entrypoints/bad-call-option/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-identifier-option/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-logic/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-main-argument/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-two-calls/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-two-functions/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-two/index.ts kk-forge(one-line-entry)",
+          "src/features/a/bad-feature.ts kk-forge(layers)",
+          "src/features/a/index.ts kk-forge(no-index-files)",
+          "src/index.ts kk-forge(no-index-files)",
+        ],
+        run.stdout + run.stderr,
+      );
+    },
+  );
 });

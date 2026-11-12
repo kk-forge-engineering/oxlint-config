@@ -1,5 +1,6 @@
 {
   "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "jsPlugins": ["./dist/plugin.js"],
   "categories": {
     "correctness": "error"
   },
@@ -25,7 +26,8 @@
     "unicorn/no-accessor-recursion": "error",
     "unicorn/no-array-fill-with-reference-type": "error",
     "typescript/no-unsafe-enum-comparison": "error",
-    "no-console": "error"
+    "no-console": "error",
+    "kk-forge/no-index-files": "error"
   },
   "overrides": [
     {

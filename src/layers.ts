@@ -1,10 +1,9 @@
-// An oxlint JS plugin with one rule, `kk-forge/layers`: a file under src/ imports only the layers its own layer may
-// take, and reaches another module only through that module's surface file. `npm run build` compiles it to
-// dist/layers.js, the file layers.json loads.
+// The rule `kk-forge/layers`: a file under src/ imports only the layers its own layer may take, and reaches another
+// module only through that module's surface file.
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
-import type { Context, CreateRule, ESTree, Plugin } from "@oxlint/plugins";
+import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
 // The layers each layer may import. A feature takes no other feature and an orchestration no other orchestration,
 // so they link through orchestration and entrypoints. Only entrypoints imports infra, which takes entities and shared.
@@ -150,6 +149,4 @@ const rule: CreateRule = {
   },
 };
 
-const plugin: Plugin = { meta: { name: "kk-forge" }, rules: { layers: rule } };
-
-export default plugin;
+export default rule;
