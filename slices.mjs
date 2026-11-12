@@ -38,11 +38,16 @@ function place(path) {
   };
 }
 
-/** Returns the file a path names, trying it as written and then with .ts, .tsx and .js, as TypeScript does. */
-const fileAt = (path) =>
-  [path, `${path}.ts`, `${path}.tsx`, `${path}.js`].find(
+/**
+ * Returns the file a path names, as TypeScript finds it: as written, then with .ts, .tsx or .js added, where a
+ * written .js or .jsx also names the .ts or .tsx file beside it.
+ */
+function fileAt(path) {
+  const base = path.replace(/\.jsx?$/, "");
+  return [path, `${base}.ts`, `${base}.tsx`, `${base}.js`].find(
     (file) => existsSync(file) && statSync(file).isFile(),
   );
+}
 
 /** Returns why an import of module `to` breaks its surface, or undefined when it takes the surface it should. */
 function surfaceProblem(from, to) {
