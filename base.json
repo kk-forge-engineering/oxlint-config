@@ -26,5 +26,13 @@
     "unicorn/no-array-fill-with-reference-type": "error",
     "typescript/no-unsafe-enum-comparison": "error",
     "no-console": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/Logger.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ]
 }

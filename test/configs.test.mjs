@@ -30,4 +30,6 @@ test('a config that extends both reports each broken rule of the fixture', () =>
   ]) {
     assert.match(run.stdout, new RegExp(rule.replace(/[()]/g, '\\$&')), run.stdout + run.stderr);
   }
+  // base.json lets a file named Logger.ts call console, so the fixture's logger reports nothing.
+  assert.doesNotMatch(run.stdout, /Logger\.ts/, run.stdout);
 });
