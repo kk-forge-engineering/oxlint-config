@@ -4,6 +4,7 @@ Shared oxlint configs for KK Forge's TypeScript packages.
 
 - `base.json`: the `correctness` category plus the bug-catching rules it lacks and `no-console`, type-aware, warnings fail. A file named `Logger.ts` may call `console`.
 - `solid.json`: eslint-plugin-solid's recommended rules.
+- `slices.json`: the layers `entrypoints → orchestration → features → entities → shared`. A file imports only layers to its right, reaches another module of `orchestration`, `features` or `entities` only through its `exports.ts`, and only `entrypoints` imports `infra`. `infra` takes `entities` and `shared`.
 
 ## Use
 

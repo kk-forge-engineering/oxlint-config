@@ -10,7 +10,8 @@
   },
   "files": [
     "base.json",
-    "solid.json"
+    "solid.json",
+    "slices.json"
   ],
   "publishConfig": {
     "access": "public"

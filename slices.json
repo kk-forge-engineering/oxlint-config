@@ -1,0 +1,345 @@
+{
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+            "message": "Import another module only through its exports.ts."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/orchestration/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){1}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|infra)/",
+                "message": "orchestration may not import entrypoints, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/orchestration/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){2}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|infra)/",
+                "message": "orchestration may not import entrypoints, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/orchestration/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){3}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|infra)/",
+                "message": "orchestration may not import entrypoints, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/orchestration/*/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){4}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|infra)/",
+                "message": "orchestration may not import entrypoints, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/features/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){1}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|infra)/",
+                "message": "features may not import entrypoints, orchestration, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/features/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){2}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|infra)/",
+                "message": "features may not import entrypoints, orchestration, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/features/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){3}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|infra)/",
+                "message": "features may not import entrypoints, orchestration, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/features/*/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){4}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|infra)/",
+                "message": "features may not import entrypoints, orchestration, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/entities/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){1}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|features|infra)/",
+                "message": "entities may not import entrypoints, orchestration, features, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/entities/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){2}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|features|infra)/",
+                "message": "entities may not import entrypoints, orchestration, features, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/entities/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){3}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|features|infra)/",
+                "message": "entities may not import entrypoints, orchestration, features, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/entities/*/*/*/*/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "^(\\.\\./){4}([^./][^/]*|\\.[^./][^/]*|\\.\\.[^/]+)/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|features|infra)/",
+                "message": "entities may not import entrypoints, orchestration, features, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/shared/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|features|entities|infra)/",
+                "message": "shared may not import entrypoints, orchestration, features, entities, infra."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/infra/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(orchestration|features|entities)/[^/]+/(([^e/][^/]*|e[^x/][^/]*|e|ex[^p/][^/]*|ex|exp[^o/][^/]*|exp|expo[^r/][^/]*|expo|expor[^t/][^/]*|expor|export[^s/][^/]*|export|exports[^\\./][^/]*|exports\\.[^j/][^/]*|exports\\.|exports\\.j[^s/][^/]*|exports\\.j|exports\\.js[^/]+)$|[^/]+/)",
+                "message": "Import another module only through its exports.ts."
+              },
+              {
+                "regex": "(^|/)(entrypoints|orchestration|features)/",
+                "message": "infra may not import entrypoints, orchestration, features."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 {
   "singleQuote": true,
   "printWidth": 120,
-  "ignorePatterns": ["test/fixtures"]
+  "ignorePatterns": ["test/fixtures", "test/slices"]
 }

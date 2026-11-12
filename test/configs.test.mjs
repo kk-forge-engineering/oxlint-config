@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
+import { basename } from 'node:path';
 import { test } from 'node:test';
 
 // oxlint runs with no flags in a folder whose config only extends base.json and solid.json, as a consumer's does.
@@ -32,4 +34,19 @@ test('a config that extends both reports each broken rule of the fixture', () =>
   }
   // base.json lets a file named Logger.ts call console, so the fixture's logger reports nothing.
   assert.doesNotMatch(run.stdout, /Logger\.ts/, run.stdout);
+});
+
+// Each file under test/slices/src named bad-* breaks one layer rule, and every other file follows them.
+test('slices.json reports each import that breaks the layers and nothing else', () => {
+  const run = spawnSync('npx', ['oxlint', '--format', 'unix'], {
+    cwd: new URL('slices', import.meta.url),
+    encoding: 'utf8',
+  });
+  const reported = [...run.stdout.matchAll(/^src\/(\S+?):\d+:/gm)]
+    .map((match) => match[1])
+    .toSorted((left, right) => left.localeCompare(right));
+  const broken = readdirSync(new URL('slices/src', import.meta.url), { recursive: true })
+    .filter((file) => basename(file).startsWith('bad-'))
+    .toSorted((left, right) => left.localeCompare(right));
+  assert.deepEqual(reported, broken, run.stdout + run.stderr);
 });
