@@ -45,3 +45,19 @@ run = "npm test"
 [tasks.pack]
 description = "Pack the package into the repo root, as the Release workflow publishes it"
 run = ["npm ci --ignore-scripts", "npm pack"]
+
+# The peers name the lowest versions that carry every rule the presets turn on. This installs those floors over the
+# lockfile's versions, runs the test on them, and puts the lockfile's versions back, pass or fail.
+[tasks."test:peer-floors"]
+description = "test on the lowest version each peer dependency allows"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'npm ci --ignore-scripts --silent' EXIT
+# A peer range is ^<floor>, so its floor is the range without the caret. Any other range form fails here.
+floors=$(node -p "Object.entries(require('./package.json').peerDependencies).map(([name, range]) => { if (!/^\^\d+\.\d+\.\d+$/.test(range)) { throw new Error(name + ' peer ' + range + ' is not ^<version>'); } return name + '@' + range.slice(1); }).join(' ')")
+echo "peer floors: $floors"
+npm install --no-save --ignore-scripts --silent $floors
+npm run build
+npm test
+'''

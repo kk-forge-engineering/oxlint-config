@@ -8,3 +8,20 @@ jobs:
   ci:
     uses: kk-forge-engineering/gh-actions/.github/workflows/ci.yml@v4
     permissions: { contents: read, pull-requests: read }
+
+  # ci tests on the lockfile's newest versions. This job tests on the lowest version each peer dependency allows, so a
+  # rule that needs a newer oxlint fails here until the peer floor rises with it.
+  peer-floors:
+    runs-on: ubuntu-26.04
+    permissions: { contents: read }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # As in ci: on a PR event, the PR head rather than GitHub's merge commit.
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+        with:
+          cache_max_age_days: 1
+      - run: mise run setup
+      - run: mise run test:peer-floors
