@@ -1,6 +1,6 @@
 {
   "name": "@kk-forge/oxlint-config",
-  "version": "5.0.1",
+  "version": "6.0.0",
   "description": "The oxlint rules KK Forge's TypeScript packages lint with",
   "license": "MIT",
   "author": "KK Forge",
@@ -31,6 +31,9 @@
     "lint:format": "oxfmt --check .",
     "lint:format:fix": "oxfmt .",
     "test": "node --test test/configs.test.ts"
+  },
+  "dependencies": {
+    "oxc-parser": "^0.158.0"
   },
   "devDependencies": {
     "@oxlint/plugins": "^1.93.0",

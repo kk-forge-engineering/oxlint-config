@@ -94,7 +94,8 @@ function reports(stdout: string): string[] {
   return tagged.toSorted((left, right) => left.localeCompare(right));
 }
 
-// The tests pack the package as npm publishes it, so they lint through the built plugin a consumer installs.
+// The tests pack the package as npm publishes it, so they lint through the
+// built plugin a consumer installs.
 await test("the packed package", async (packedPackage) => {
   const packed = mkdtempSync(join(tmpdir(), "oxlint-config-"));
   packedPackage.after(() => rmSync(packed, { recursive: true, force: true }));
@@ -111,16 +112,35 @@ await test("the packed package", async (packedPackage) => {
   assert.equal(pack.status, 0, pack.stderr);
   const tarball = join(packed, pack.stdout.trim().split("\n").at(-1) ?? "");
 
-  // Each file under test/layers/src or test/layers/tests named bad-* breaks one layer rule, and every other file follows
-  // them.
+  // Each file under test/layers/src or test/layers/tests named bad-* breaks one
+  // layer rule, and every other file keeps them. The test installs the tarball
+  // outside the repo, so the plugin finds only the dependencies the package
+  // declares. --legacy-peer-deps skips the peers, so the repo's own are used.
   await packedPackage.test(
     "layers.json reports each import that breaks the layers and nothing else",
     () => {
-      const unpacked = join(packed, "layers");
-      mkdirSync(unpacked);
-      assert.equal(spawnSync("tar", ["-xzf", tarball, "-C", unpacked]).status, 0);
-      const config = join(unpacked, "consumer.json");
-      writeFileSync(config, JSON.stringify({ extends: ["./package/layers.json"] }));
+      const installed = join(packed, "layers");
+      mkdirSync(installed);
+      writeFileSync(join(installed, "package.json"), JSON.stringify({ private: true }));
+      const install = spawnSync(
+        "npm",
+        [
+          "install",
+          "--prefer-offline",
+          "--ignore-scripts",
+          "--legacy-peer-deps",
+          "--no-audit",
+          "--no-fund",
+          tarball,
+        ],
+        { cwd: installed, encoding: "utf8" },
+      );
+      assert.equal(install.status, 0, install.stdout + install.stderr);
+      const config = join(installed, "consumer.json");
+      writeFileSync(
+        config,
+        JSON.stringify({ extends: ["./node_modules/@kk-forge/oxlint-config/layers.json"] }),
+      );
       const run = spawnSync("npx", ["oxlint", "-c", config, "--format", "unix"], {
         cwd: new URL("layers", import.meta.url),
         encoding: "utf8",
