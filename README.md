@@ -38,7 +38,7 @@ Each preset owns one concern, so a package extends only the ones that describe i
 npm install -D @kk-forge/oxlint-config oxlint oxlint-tsgolint
 ```
 
-A Solid package also installs `eslint-plugin-solid` 0.19. The presets need oxlint 1.93 or later. oxlint resolves `extends` from the config's folder, so give the path:
+A Solid package also installs `eslint-plugin-solid` 0.19 or later. The presets need oxlint 1.90 and oxlint-tsgolint 7.0.2005 or later. oxlint resolves `extends` from the config's folder, so give the path:
 
 ```json
 {
@@ -77,7 +77,7 @@ In both definitions the function's parameters are plain names, with no defaults.
 - A package with vitest tests adds `vitest.json`. Its `require-mock-type-parameters` reports each `vi.fn()` without a type parameter.
 - `no-console` is allowed only in `src/shared/Logger.ts`. A logger elsewhere moves there.
 - The package's `tsconfig.json` sets `"noImplicitReturns": true`, and its lint script runs bare `oxlint`.
-- The peer versions rise to oxlint 1.93, oxlint-tsgolint 7.0.2006 and eslint-plugin-solid 0.19.
+- The peer versions rise to oxlint 1.90, oxlint-tsgolint 7.0.2005 and eslint-plugin-solid 0.19.
 
 ## Development
 

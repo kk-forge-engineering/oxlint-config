@@ -1,6 +1,6 @@
 {
   "name": "@kk-forge/oxlint-config",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "The oxlint rules KK Forge's TypeScript packages lint with",
   "license": "MIT",
   "author": "KK Forge",
@@ -43,8 +43,8 @@
   },
   "peerDependencies": {
     "eslint-plugin-solid": "^0.19.0",
-    "oxlint": "^1.93.0",
-    "oxlint-tsgolint": "^7.0.2006"
+    "oxlint": "^1.90.0",
+    "oxlint-tsgolint": "^7.0.2005"
   },
   "peerDependenciesMeta": {
     "eslint-plugin-solid": {
