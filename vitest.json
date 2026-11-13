@@ -1,0 +1,29 @@
+{
+  "overrides": [
+    {
+      // vitest's own default include: every *.test.* and *.spec.* script.
+      "files": ["**/*.{test,spec}.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+      "plugins": ["vitest"],
+      "rules": {
+        "vitest/expect-expect": "error",
+        "vitest/hoisted-apis-on-top": "error",
+        "vitest/no-conditional-expect": "error",
+        "vitest/no-conditional-tests": "error",
+        "vitest/no-disabled-tests": "error",
+        "vitest/no-focused-tests": "error",
+        "vitest/no-standalone-expect": "error",
+        "vitest/prefer-snapshot-hint": "error",
+        "vitest/require-awaited-expect-poll": "error",
+        "vitest/require-local-test-context-for-concurrent-snapshots": "error",
+        "vitest/require-mock-type-parameters": "error",
+        "vitest/require-to-throw-message": "error",
+        "vitest/valid-describe-callback": "error",
+        "vitest/valid-expect": "error",
+        "vitest/valid-expect-in-promise": "error",
+        "vitest/warn-todo": "error",
+        // The option lets a describe title be a class or a function, which vitest names the block after.
+        "vitest/valid-title": ["error", { "ignoreTypeOfDescribeName": true }]
+      }
+    }
+  ]
+}

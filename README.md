@@ -2,17 +2,33 @@
 
 Shared oxlint configs for KK Forge's TypeScript packages.
 
-- `typescript.json`: the `correctness` category plus the rules it lacks that catch a bug or code that misleads its reader, type-aware, warnings fail. It turns on these besides:
-  - The `no-unsafe-*` family, so a value typed `any` cannot be called, read, passed or returned unchecked.
-  - `only-throw-error`, so every throw carries a stack.
-  - The `no-unnecessary-*` family and `no-extraneous-class`: a cast, conversion, comparison, template or type parameter that changes nothing, a class of only statics, which is a module with extra syntax, and `import/no-named-as-default-member`, a default import read for a name the module also exports.
-  - `no-console`, everywhere but a file named `Logger.ts`.
+Each preset owns one concern, so a package extends only the ones that describe it, and any combination works. Every preset that uses a `kk-forge` rule loads the plugin itself, and a config that extends several reports each problem once.
+
+| Package                               | Presets                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| TypeScript library                    | `typescript.json`                                                         |
+| TypeScript library tested with vitest | `typescript.json`, `vitest.json`                                          |
+| Solid library                         | `typescript.json`, `solid.json`, `vitest.json`                            |
+| Node service or CLI                   | `typescript.json`, `layers.json`, `vitest.json`                           |
+| Solid web app                         | `typescript.json`, `solid.json`, `layers.json`, `vitest.json`             |
+| WXT extension with Solid              | `typescript.json`, `solid.json`, `layers.json`, `wxt.json`, `vitest.json` |
+
+- `typescript.json`, the language: the `correctness` category plus the rules it lacks that catch a bug or code that misleads its reader, type-aware, warnings fail. It turns on these besides:
+  - The `no-unsafe-*` family and `no-unsafe-type-assertion`, so a value typed `any`, or cast to a type it was never checked against, cannot flow on unchecked. A value from outside, such as JSON or a message, gets a parser.
+  - `only-throw-error` and `prefer-promise-reject-errors`, so every throw and rejection carries a stack.
+  - `no-deprecated`, so a deprecated API is replaced when it is first used, not when it is removed.
+  - The `no-unnecessary-*` family, `no-extraneous-class` and `import/no-named-as-default-member`: a cast, conversion, comparison, template or type parameter that changes nothing, a class of only statics, which is a module with extra syntax, and a default import read for a name the module also exports.
+  - `eqeqeq`, keeping `== null`, which tests for both `null` and `undefined`. `curly`, so a guard is never one line without braces. `max-lines` at 450 lines of code, the size past which code-style.md splits a file. Blank lines and comments do not count, since they carry no logic. A flat command dispatch, which code-style.md measures by its longest arm, takes a disable comment with that reason.
+  - `no-console`, everywhere but the logger, `src/shared/Logger.ts`, as core.md names it.
   - `import/no-unassigned-import`, so a side-effect import such as `import "./setup"` fails, since assembly is an explicit call. It allows `*.css`, and a `*.d.ts` file, where `import "x"` makes a module augmentation.
   - `kk-forge/no-index-files`, which rejects a file named `index.ts`, `index.tsx`, `index.js` or `index.jsx`, since tooling resolves that name implicitly. A module's surface is its `exports.ts`.
-  - The `vitest` plugin's correctness rules, for an assertion that never runs or never awaits. `typescript/unbound-method` stays on in tests too: a test holds the mock itself, as in `const send = vi.fn(); const port = { send }; expect(send)…`, or `const send = vi.spyOn(port, "send")`.
-- `solid.json`: eslint-plugin-solid's recommended rules, `solid/no-unused-signal`, `solid/no-accessor-as-prop`, the `jsx-a11y` plugin's correctness rules, and `kk-forge/no-conditional-map`. That last rule fails a `.map()` list of JSX nodes under a condition, such as `{open && rows.map(…)}`, `||`, `??` or `? :`. Solid reruns such an expression on any change and builds every row again, and `solid/prefer-for` catches only a `.map()` that is the whole expression. Render the list with `<For>` inside `<Show>`.
-- `wxt.json`: the shape of a WXT entrypoint, under **WXT** below.
-- `layers.json`: the layers `entrypoints → orchestration → features → entities → shared`. A file imports only layers to its right, and entities also each other. It reaches another module only through that module's `exports.ts`, or `exports.<entrypoint>.ts`, where `<entrypoint>` names a folder or file in `src/entrypoints`, such as `exports.background.ts` or `exports.overlay.content.ts`. A module that has a surface for an entrypoint serves that entrypoint through it. A `shared` module is one file, which is its own surface, or a folder reached through its `exports.ts`. Each file or folder directly under `infra/` is a module of its own. Only `entrypoints` and `infra` import `infra`, which takes `entities` and `shared`.
+
+  A function that returns a value on one path and nothing on another hides a missing branch. The package's `tsconfig.json` sets `"noImplicitReturns": true`, which catches that, so the presets add no lint rule for it.
+
+- `vitest.json`, the tests: the `vitest` plugin's correctness rules on `*.test.*` and `*.spec.*` files, which is vitest's own default include. They catch an assertion that never runs, never awaits or sits in a branch, a focused or skipped test, and a `vi.fn()` without its type, which is an `any` in the test. A test holds the typed mock itself, as in `const send = vi.fn<Port["send"]>(); const port = { send }; expect(send)…`, or `const send = vi.spyOn(port, "send")`. Reading `port.send` instead trips `typescript/unbound-method`, which `typescript.json` keeps on in tests too.
+- `solid.json`, Solid and its JSX: eslint-plugin-solid's recommended rules, `solid/no-unused-signal`, `solid/no-accessor-as-prop`, `solid/no-module-scope-reactive-primitive`, the `jsx-a11y` plugin's correctness rules, and `kk-forge/no-conditional-map`. A signal or memo at module scope is global state that bypasses the composition root, so a component or the composition root creates it. `kk-forge/no-conditional-map` fails a `.map()` list in JSX children under a condition, such as `{open && rows.map(…)}`, `||`, `??` or `? :`. Solid reruns such an expression on any change and builds every row again, and `solid/prefer-for` catches only a `.map()` that is the whole expression. Render the list with `<For>` inside `<Show>`.
+- `wxt.json`, a WXT extension's entrypoints, under **WXT** below.
+- `layers.json`, an app's architecture: the layers `entrypoints → orchestration → features → entities → shared`. A file imports only layers to its right, and entities also each other. It reaches another module only through that module's `exports.ts`, or `exports.<entrypoint>.ts`, where `<entrypoint>` names a folder or file in `src/entrypoints`, such as `exports.background.ts` or `exports.overlay.content.ts`. A module that has a surface for an entrypoint serves that entrypoint through it. A `shared` module is one file, which is its own surface, or a folder reached through its `exports.ts`. Each file or folder directly under `infra/` is a module of its own. Only `entrypoints` and `infra` import `infra`, which takes `entities` and `shared`.
 
   A test in a `tests/` folder whose parent folder holds `src/` may import any layer. For a nested `tests/` folder, the innermost one with a `src/` beside it counts. In such a test, `@/` and `~/` name that `src/`. The test reaches a module, an `infra` folder included, only through its `exports.ts` or an `exports.<entrypoint>.ts`. A `shared` or `infra` module that is one file is its own surface. The test may import any file of an entrypoint, which has no surface. A unit test inside `src/`, such as `foo.unit.test.ts` beside `foo.ts`, follows the rules of its module's other files, so it may import that module's internals.
 
@@ -35,7 +51,7 @@ A Solid package also installs `eslint-plugin-solid` 0.19. The presets need oxlin
 
 The package's lint script runs bare `oxlint`, and its fix script `oxlint --fix`, over the whole package. `.gitignore` and the config's `ignorePatterns` say what to skip, so tests, build scripts and tool configs are linted too. A folder list such as `oxlint src` leaves the rest unlinted, and no rule in a preset can see that.
 
-An app adds `"./node_modules/@kk-forge/oxlint-config/layers.json"` as a third entry. A library leaves it out, since the layers describe an app's `src/`. A package's own rules go below `extends` and win. A package's config holds only exceptions about its own files or names, each with its reason. A rule that would suit any package belongs in a preset.
+The table above names the rest of `extends`. A library leaves out `layers.json`, since the layers describe an app's `src/`. A package's own rules go below `extends` and win. A package's config holds only exceptions about its own files or names, each with its reason. A rule that would suit any package belongs in a preset.
 
 ## WXT
 
@@ -58,6 +74,9 @@ In both definitions the function's parameters are plain names, with no defaults.
 - `wxt.json` replaces the override a WXT package held for its `index.ts` files. Drop that override, and the flat-file override that turned the rule on for `entrypoints/<name>.ts`. Move each such file to `entrypoints/<name>/index.ts`.
 - `typescript.json` turns on `import/no-unassigned-import`, allowing only `*.css`, and it is off in `*.d.ts`, where `import "x"` makes a module augmentation. A package drops its own copy of the rule. A side-effect import that assembles code, such as `import "./dependencies"`, becomes an explicit call.
 - `typescript.json` and `solid.json` turn on the rules they list above that 4 lacked.
+- A package with vitest tests adds `vitest.json`. Its `require-mock-type-parameters` reports each `vi.fn()` without a type parameter.
+- `no-console` is allowed only in `src/shared/Logger.ts`. A logger elsewhere moves there.
+- The package's `tsconfig.json` sets `"noImplicitReturns": true`, and its lint script runs bare `oxlint`.
 - The peer versions rise to oxlint 1.93, oxlint-tsgolint 7.0.2006 and eslint-plugin-solid 0.19.
 
 ## Development

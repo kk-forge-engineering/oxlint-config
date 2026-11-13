@@ -1,4 +1,5 @@
-// This code breaks each rule that configs.test.mjs lists, and the test expects every one of them reported.
+// This code breaks each typescript.json and solid.json rule that configs.test.ts lists, and the test expects every one
+// of them reported. Long.ts breaks max-lines, which judges a whole file.
 import "./register";
 import { createSignal } from "solid-js";
 import tool from "./utils/tool";
@@ -86,3 +87,12 @@ export function Counter() {
   let input: HTMLInputElement;
   return <input value={count} onInput={() => input.focus()} />;
 }
+export const assigned: string = loose;
+export const narrowed = (plain as unknown) as number;
+export const parsed = Number.parseInt("1") as 1;
+export const escaped = escape("a");
+export const rejected = Promise.reject("failed");
+export const loose2 = plain == "a";
+if (isOn(true)) console.info("on");
+export const [shared] = createSignal(0);
+export const isMissing = plain == null;

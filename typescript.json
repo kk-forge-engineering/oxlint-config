@@ -1,5 +1,5 @@
 {
-  "plugins": ["typescript", "unicorn", "oxc", "import", "vitest"],
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
   "jsPlugins": ["./dist/plugin.js"],
   "categories": {
     "correctness": "error"
@@ -31,7 +31,11 @@
     "typescript/no-unsafe-call": "error",
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-type-assertion": "error",
     "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/no-deprecated": "error",
     "typescript/no-unnecessary-type-assertion": "error",
     "typescript/no-unnecessary-type-conversion": "error",
     "typescript/no-unnecessary-type-arguments": "error",
@@ -40,17 +44,19 @@
     "typescript/no-unnecessary-template-expression": "error",
     "typescript/no-extraneous-class": "error",
     "import/no-named-as-default-member": "error",
-    // Off pending a decision: 203 vi.fn() calls across three apps carry no type parameter.
-    "vitest/require-mock-type-parameters": "off",
-    // The option lets a describe title be a class or a function, which vitest names the block after.
-    "vitest/valid-title": ["error", { "ignoreTypeOfDescribeName": true }],
+    // == null is the one loose comparison kept: it tests for both null and undefined, which DOM APIs return.
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "curly": ["error", "all"],
+    // code-style.md splits a file past about 450 lines. Blank lines and comments carry no logic, so they do not count.
+    "max-lines": ["error", { "max": 450, "skipBlankLines": true, "skipComments": true }],
     "no-console": "error",
     "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
     "kk-forge/no-index-files": "error"
   },
   "overrides": [
     {
-      "files": ["**/Logger.ts"],
+      // The logger in shared is the one sink that writes to the console. core.md names it src/shared/Logger.ts.
+      "files": ["**/src/shared/Logger.ts"],
       "rules": {
         "no-console": "off"
       }

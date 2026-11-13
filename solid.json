@@ -22,6 +22,7 @@
     "solid/validate-jsx-nesting": "error",
     "solid/no-unused-signal": "error",
     "solid/no-accessor-as-prop": "error",
+    "solid/no-module-scope-reactive-primitive": "error",
     // solid/no-unassigned-vars replaces it: Solid assigns `let ref` through the JSX ref attribute, which only the
     // Solid rule sees.
     "no-unassigned-vars": "off",
