@@ -6,10 +6,10 @@ import { basename, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-// oxlint runs with no flags in a folder whose config only extends typescript.json and solid.json, as a consumer's does.
-// So the run also shows that typeAware and denyWarnings reach it through extends, and that solid.json finds the
-// plugin from the package's folder.
-await test("a config that extends both reports each broken rule of the fixture", () => {
+// oxlint runs with no flags in a folder whose config only extends typescript.json, solid.json and vitest.json, as a
+// consumer's does. So the run also shows that typeAware and denyWarnings reach it through extends, and that solid.json
+// finds the plugin from the package's folder.
+await test("a config that extends the presets reports each broken rule of the fixture", () => {
   const run = spawnSync("npx", ["oxlint", "--format", "unix"], {
     cwd: new URL("fixtures", import.meta.url),
     encoding: "utf8",
@@ -31,11 +31,55 @@ await test("a config that extends both reports each broken rule of the fixture",
     "unicorn(no-array-fill-with-reference-type)",
     "typescript(no-unsafe-enum-comparison)",
     "eslint(no-console)",
+    "import(no-unassigned-import)",
+    "typescript(no-unsafe-enum-assignment)",
+    "typescript(no-unsafe-argument)",
+    "typescript(no-unsafe-call)",
+    "typescript(no-unsafe-member-access)",
+    "typescript(no-unsafe-return)",
+    "typescript(only-throw-error)",
+    "typescript(no-unnecessary-type-assertion)",
+    "typescript(no-unnecessary-type-conversion)",
+    "typescript(no-unnecessary-type-arguments)",
+    "typescript(no-unnecessary-type-parameters)",
+    "typescript(no-unnecessary-boolean-literal-compare)",
+    "typescript(no-unnecessary-template-expression)",
+    "typescript(no-extraneous-class)",
+    "import(no-named-as-default-member)",
+    "vitest(expect-expect)",
+    "vitest(valid-expect)",
+    "vitest(no-conditional-expect)",
+    "vitest(no-standalone-expect)",
+    "vitest(require-to-throw-message)",
+    "vitest(valid-title)",
+    "vitest(require-mock-type-parameters)",
+    "typescript(no-unsafe-assignment)",
+    "typescript(no-unsafe-type-assertion)",
+    "typescript(no-deprecated)",
+    "typescript(prefer-promise-reject-errors)",
+    "eslint(eqeqeq)",
+    "eslint(curly)",
+    "eslint(max-lines)",
+    "solid(no-module-scope-reactive-primitive)",
+    "solid(validate-jsx-nesting)",
+    "solid(no-unused-signal)",
+    "solid(no-accessor-as-prop)",
+    "solid(no-unassigned-vars)",
+    "jsx-a11y(alt-text)",
   ]) {
     assert.match(run.stdout, new RegExp(rule.replace(/[()]/g, "\\$&")), run.stdout + run.stderr);
   }
-  // typescript.json lets a file named Logger.ts call console, so the fixture's logger reports nothing.
-  assert.doesNotMatch(run.stdout, /Logger\.ts/, run.stdout);
+  // vitest.json judges test files only, so utils/check.ts, which is no test, gets no vitest report.
+  assert.doesNotMatch(run.stdout, /utils\/check\.ts:.*vitest/, run.stdout);
+  // eqeqeq keeps == null, so Broken.tsx gets one eqeqeq report, for its == "a" and not its == null.
+  assert.equal(run.stdout.match(/eslint\(eqeqeq\)/g)?.length, 1, run.stdout);
+  // typescript.json lets only the logger in shared call console, so a Logger.ts elsewhere is reported.
+  assert.doesNotMatch(run.stdout, /shared\/Logger\.ts/, run.stdout);
+  assert.match(
+    run.stdout,
+    /utils\/Logger\.ts:\d+:\d+: .* \[Error\/eslint\(no-console\)\]/,
+    run.stdout,
+  );
 });
 
 /**
@@ -95,10 +139,11 @@ await test("the packed package", async (packedPackage) => {
     },
   );
 
-  // test/consumer is an app that installs the package and extends typescript.json and layers.json, which both load the
-  // plugin. Its .oxlintrc.json, comment included, turns one-line-entry on for its WXT entrypoints and no-index-files off.
+  // test/consumer is a WXT app with Solid that installs the package and extends every preset but vitest.json. Each of
+  // those loads the plugin, and the list shows each problem once. Each file named bad-* or in a folder named bad-*
+  // breaks a rule, and so does each file named index.ts outside an entrypoint. Every other file follows the rules.
   await packedPackage.test(
-    "a consumer's override turns one-line-entry on and no-index-files off for its entrypoints",
+    "a WXT app with Solid gets a report for each broken rule and nothing else",
     (context) => {
       const installed = new URL("consumer/node_modules/@kk-forge/oxlint-config", import.meta.url);
       context.after(() =>
@@ -120,22 +165,30 @@ await test("the packed package", async (packedPackage) => {
       assert.deepEqual(
         reports(run.stdout),
         [
-          "src/entrypoints/bad-call-option/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-default-parameter/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-call-option/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-default-parameter/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-flat.ts kk-forge(wxt-entrypoint-folder)",
           "src/entrypoints/bad-generator/index.ts eslint(require-yield)",
-          "src/entrypoints/bad-generator/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-identifier-option/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-iife/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-logic/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-main-argument/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-nested-arrow/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-nested-call/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-then/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-two-calls/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-two-functions/index.ts kk-forge(one-line-entry)",
-          "src/entrypoints/bad-two/index.ts kk-forge(one-line-entry)",
+          "src/entrypoints/bad-generator/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-identifier-option/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-iife/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-logic/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-main-argument/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-nested-arrow/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-nested-call/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-render/index.tsx kk-forge(launcher)",
+          "src/entrypoints/bad-then/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-two-calls/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-two-functions/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-two/index.ts kk-forge(launcher)",
           "src/features/a/bad-feature.ts kk-forge(layers)",
+          "src/features/a/bad-side-effect.ts import(no-unassigned-import)",
           "src/features/a/index.ts kk-forge(no-index-files)",
+          "src/features/list/bad-and.tsx kk-forge(no-conditional-map)",
+          "src/features/list/bad-nullish.tsx kk-forge(no-conditional-map)",
+          "src/features/list/bad-or.tsx kk-forge(no-conditional-map)",
+          "src/features/list/bad-plain.tsx solid(prefer-for)",
+          "src/features/list/bad-ternary.tsx kk-forge(no-conditional-map)",
           "src/index.ts kk-forge(no-index-files)",
           "tests/bad-deep.ts kk-forge(layers)",
         ],

@@ -26,14 +26,46 @@
     "unicorn/no-accessor-recursion": "error",
     "unicorn/no-array-fill-with-reference-type": "error",
     "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-enum-assignment": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-type-assertion": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unnecessary-type-conversion": "error",
+    "typescript/no-unnecessary-type-arguments": "error",
+    "typescript/no-unnecessary-type-parameters": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "error",
+    "typescript/no-unnecessary-template-expression": "error",
+    "typescript/no-extraneous-class": "error",
+    "import/no-named-as-default-member": "error",
+    // == null is the one loose comparison kept: it tests for both null and undefined, which DOM APIs return.
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "curly": ["error", "all"],
+    // code-style.md splits a file past about 450 lines. Blank lines and comments carry no logic, so they do not count.
+    "max-lines": ["error", { "max": 450, "skipBlankLines": true, "skipComments": true }],
     "no-console": "error",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
     "kk-forge/no-index-files": "error"
   },
   "overrides": [
     {
-      "files": ["**/Logger.ts"],
+      // The logger in shared is the one sink that writes to the console. core.md names it src/shared/Logger.ts.
+      "files": ["**/src/shared/Logger.ts"],
       "rules": {
         "no-console": "off"
+      }
+    },
+    {
+      // A declaration file imports a module bare to augment that module's types, and the import runs no code.
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "import/no-unassigned-import": "off"
       }
     }
   ]

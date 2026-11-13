@@ -4,5 +4,5 @@
     "jsxImportSource": "solid-js",
     "noEmit": true
   },
-  "include": ["*.tsx"]
+  "include": ["*.ts", "*.tsx", "utils", "src"]
 }

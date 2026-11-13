@@ -1,0 +1,11 @@
+{
+  "jsPlugins": ["./dist/plugin.js"],
+  "rules": { "kk-forge/wxt-entrypoint-folder": "error" },
+  "overrides": [
+    // WXT builds an entrypoint folder from the file named index, so that file keeps the name and holds one call.
+    {
+      "files": ["**/entrypoints/*/index.ts", "**/entrypoints/*/index.tsx"],
+      "rules": { "kk-forge/no-index-files": "off", "kk-forge/launcher": "error" }
+    }
+  ]
+}
