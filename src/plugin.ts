@@ -1,14 +1,22 @@
-// The oxlint JS plugin `kk-forge`. `npm run build` compiles it to dist/plugin.js, which typescript.json and layers.json
-// load.
+// The oxlint JS plugin `kk-forge`. `npm run build` compiles it to dist/plugin.js, which every preset that turns on one
+// of its rules loads.
 import type { Plugin } from "@oxlint/plugins";
 
+import launcher from "./launcher.js";
 import layers from "./layers.js";
+import noConditionalMap from "./no-conditional-map.js";
 import noIndexFiles from "./no-index-files.js";
-import oneLineEntry from "./one-line-entry.js";
+import wxtEntrypointFolder from "./wxt-entrypoint-folder.js";
 
 const plugin: Plugin = {
   meta: { name: "kk-forge" },
-  rules: { layers, "no-index-files": noIndexFiles, "one-line-entry": oneLineEntry },
+  rules: {
+    launcher,
+    layers,
+    "no-conditional-map": noConditionalMap,
+    "no-index-files": noIndexFiles,
+    "wxt-entrypoint-folder": wxtEntrypointFolder,
+  },
 };
 
 export default plugin;

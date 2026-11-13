@@ -1,4 +1,10 @@
 {
-  "compilerOptions": { "module": "nodenext", "strict": true, "noEmit": true },
+  "compilerOptions": {
+    "module": "nodenext",
+    "strict": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js"
+  },
   "include": ["src"]
 }

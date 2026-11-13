@@ -1,6 +1,6 @@
-// The rule `kk-forge/one-line-entry`: a file a framework requires by name holds its imports and one line, which is
-// the framework's own definition with one call or a bare call, so the logic stays in code the project names. A project
-// turns it on for those files only.
+// The rule `kk-forge/launcher`. A launcher is a file a framework requires by name. The rule lets it hold its imports and
+// one line: the framework's own definition around one call, or a bare call. The logic then stays in code the project
+// names. wxt.json turns the rule on for WXT's entrypoint files.
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
 type Statement = ESTree.Program["body"][number];
@@ -119,7 +119,7 @@ function isEntryLine(statement: Statement): boolean {
 const rule: CreateRule = {
   meta: {
     type: "problem",
-    docs: { description: "Keeps a file a framework requires by name to its imports and one line" },
+    docs: { description: "Keeps a launcher to its imports and one line" },
   },
   create(context: Context) {
     return {
@@ -132,7 +132,7 @@ const rule: CreateRule = {
           context.report({
             node: offending,
             message:
-              "A framework entry file is one line. Put its logic in the start…() or mount…() it calls.",
+              "A launcher holds its imports and one line. Put its logic in the project function that line calls.",
           });
         }
       },

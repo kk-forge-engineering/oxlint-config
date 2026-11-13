@@ -1,5 +1,5 @@
 {
-  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "plugins": ["typescript", "unicorn", "oxc", "import", "vitest"],
   "jsPlugins": ["./dist/plugin.js"],
   "categories": {
     "correctness": "error"
@@ -26,7 +26,26 @@
     "unicorn/no-accessor-recursion": "error",
     "unicorn/no-array-fill-with-reference-type": "error",
     "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-enum-assignment": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unnecessary-type-conversion": "error",
+    "typescript/no-unnecessary-type-arguments": "error",
+    "typescript/no-unnecessary-type-parameters": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "error",
+    "typescript/no-unnecessary-template-expression": "error",
+    "typescript/no-extraneous-class": "error",
+    "import/no-named-as-default-member": "error",
+    // Off pending a decision: 203 vi.fn() calls across three apps carry no type parameter.
+    "vitest/require-mock-type-parameters": "off",
+    // The option lets a describe title be a class or a function, which vitest names the block after.
+    "vitest/valid-title": ["error", { "ignoreTypeOfDescribeName": true }],
     "no-console": "error",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
     "kk-forge/no-index-files": "error"
   },
   "overrides": [
@@ -34,6 +53,13 @@
       "files": ["**/Logger.ts"],
       "rules": {
         "no-console": "off"
+      }
+    },
+    {
+      // A declaration file imports a module bare to augment that module's types, and the import runs no code.
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "import/no-unassigned-import": "off"
       }
     }
   ]

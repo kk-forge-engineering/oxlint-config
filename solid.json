@@ -1,5 +1,6 @@
 {
-  "jsPlugins": ["eslint-plugin-solid"],
+  "plugins": ["jsx-a11y"],
+  "jsPlugins": ["eslint-plugin-solid", "./dist/plugin.js"],
   "rules": {
     "solid/jsx-no-duplicate-props": "error",
     "solid/jsx-no-undef": "error",
@@ -10,6 +11,7 @@
     "solid/components-return-once": "error",
     "solid/no-destructure": "error",
     "solid/prefer-for": "error",
+    "kk-forge/no-conditional-map": "error",
     "solid/reactivity": "error",
     "solid/event-handlers": "error",
     "solid/imports": "error",
@@ -17,6 +19,12 @@
     "solid/no-react-deps": "error",
     "solid/no-react-specific-props": "error",
     "solid/self-closing-comp": "error",
-    "no-unassigned-vars": "off"
+    "solid/validate-jsx-nesting": "error",
+    "solid/no-unused-signal": "error",
+    "solid/no-accessor-as-prop": "error",
+    // solid/no-unassigned-vars replaces it: Solid assigns `let ref` through the JSX ref attribute, which only the
+    // Solid rule sees.
+    "no-unassigned-vars": "off",
+    "solid/no-unassigned-vars": "error"
   }
 }
