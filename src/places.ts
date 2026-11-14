@@ -95,3 +95,7 @@ export function placeOfImport(
   }
   return to;
 }
+
+/** Returns whether a path inside a feature sits in the feature's own infra/, the adapters only that feature needs. */
+export const isFeatureInfra = (at: Place): boolean =>
+  at.layer === "features" && (at.inside === "infra" || at.inside.startsWith("infra/"));

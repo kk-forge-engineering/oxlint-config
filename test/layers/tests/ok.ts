@@ -1,3 +1,4 @@
+export { store } from "../src/features/a/infra/exports";
 import { a } from "../src/features/a/exports";
 import { background } from "../src/features/a/exports.background";
 import { user } from "../src/entities/user/exports";
