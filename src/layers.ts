@@ -8,7 +8,15 @@ import { join, sep } from "node:path";
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
 import { moduleProblem } from "./module-counts.js";
-import { allowed, fileAt, type Layer, type Place, place, placeOfImport } from "./places.js";
+import {
+  allowed,
+  fileAt,
+  isFeatureInfra,
+  type Layer,
+  type Place,
+  place,
+  placeOfImport,
+} from "./places.js";
 
 /** The layers whose modules another module reaches only through a surface file. */
 const published = new Set<Layer>(["orchestration", "features", "entities", "shared"]);
@@ -43,6 +51,12 @@ function isSurface(to: Place): boolean {
 
 /** Returns why a test's import of module `to` breaks its surface, or undefined when it takes a surface. */
 function testProblem(to: Place): string | undefined {
+  // A feature's infra/ is the feature's second surface, reached through its own exports.ts.
+  if (isFeatureInfra(to)) {
+    return to.inside === "infra/exports"
+      ? undefined
+      : "Import a feature's infra through its infra/exports.ts.";
+  }
   // A test drives an entrypoint, which has no surface file. A shared or infra module that is one file is its own surface.
   if (to.layer === "entrypoints" || ((to.layer === "shared" || to.layer === "infra") && to.file)) {
     return undefined;
@@ -57,9 +71,19 @@ function memberProblem(from: Place, to: Place): string | undefined {
   if (to.module === from.module) {
     return undefined;
   }
-  const allowedLayers: readonly Layer[] = allowed[from.layer];
+  // A feature's infra/ holds that feature's adapters, so it also imports the root infra they build on.
+  const allowedLayers: readonly Layer[] = isFeatureInfra(from)
+    ? [...allowed.features, "infra"]
+    : allowed[from.layer];
   if (!allowedLayers.includes(to.layer)) {
     return `${from.layer} may not import ${to.layer}.`;
+  }
+  // The composition root, an entrypoint's compose.ts, reaches a feature's infra/, its second surface, through
+  // infra/exports.ts.
+  if (from.layer === "entrypoints" && from.inside === "compose" && isFeatureInfra(to)) {
+    return to.inside === "infra/exports"
+      ? undefined
+      : "Import a feature's infra through its infra/exports.ts.";
   }
   return published.has(to.layer) ? surfaceProblem(from, to) : undefined;
 }
