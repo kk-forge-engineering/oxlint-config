@@ -1,3 +1,3 @@
-import { b } from "../b/exports";
+import { newBUseCases } from "../b/exports";
 
-export { b };
+export { newBUseCases };

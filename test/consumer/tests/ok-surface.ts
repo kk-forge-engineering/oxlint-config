@@ -1,3 +1,3 @@
-import { b } from "../src/features/b/exports";
+import { newBUseCases } from "../src/features/b/exports";
 
-export { b };
+export { newBUseCases };

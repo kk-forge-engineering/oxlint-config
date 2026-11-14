@@ -1,4 +1,7 @@
-// A feature's infra builds on the root infra, which the feature's other code may not import.
+import type { Store } from "../port";
+import { user } from "../../../entities/user/exports";
 import { log } from "../../../infra/ok";
 import { logger } from "../../../shared/logger/exports";
-export const store = { log, logger };
+export const store: Store = { get: () => String(user) };
+export const at = Date.now();
+export { log, logger };

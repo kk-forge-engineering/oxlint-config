@@ -55,8 +55,16 @@
   },
   "overrides": [
     {
-      // The logger in shared is the one sink that writes to the console. core.md names it src/shared/Logger.ts.
-      "files": ["**/src/shared/Logger.ts"],
+      // A test is not the program, so it may print, as core.md exempts it from the environment rules.
+      "files": ["**/*.test.*", "**/*.spec.*", "**/tests/**"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      // Only infra writes output, a feature's infra/ included, so only infra calls the console. core.md vendors the
+      // console sink into src/infra/logger.
+      "files": ["**/src/infra/**", "**/src/features/*/infra/**"],
       "rules": {
         "no-console": "off"
       }

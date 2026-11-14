@@ -1,1 +1,1 @@
-export const badExtract = 1;
+export type badExtract = number;

@@ -1,6 +1,8 @@
 // Where a path sits in the layers of an app's src/ folder, and which module an import names.
 import { existsSync, statSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, resolve, sep } from "node:path";
+
+import { aliasTarget } from "./tsconfig.js";
 
 /**
  * Maps each layer to the layers it may import. Features link only through orchestration and entrypoints, and
@@ -12,9 +14,15 @@ export const allowed = {
   features: ["entities", "shared"],
   entities: ["entities", "shared"],
   shared: ["shared"],
-  infra: ["infra", "entities", "shared"],
+  infra: ["infra", "shared"],
 } as const satisfies Record<string, readonly string[]>;
 export type Layer = keyof typeof allowed;
+
+/** Matches the name of a test file, `*.test.*` or `*.spec.*` with a JavaScript or TypeScript extension. */
+export const testFile = /\.(test|spec)\.[cm]?[jt]sx?$/;
+
+/** Matches the name of a declaration file, `*.d.ts`, which only describes types. */
+export const declarationFile = /\.d\.[cm]?ts$/;
 
 export interface Place {
   layer: Layer;
@@ -71,19 +79,19 @@ export function fileAt(path: string): string | undefined {
 }
 
 /**
- * Returns the module a specifier names from `filename`, or undefined outside the layers. It reads `@/` and `~/` as
- * `root`, the src/ folder they alias.
+ * Returns the path a specifier names from `filename`, or undefined for a package. A specifier that is no relative path
+ * resolves through the `paths` of the file's tsconfig.json, and one no pattern matches is a package.
  */
-export function placeOfImport(
-  root: string,
-  filename: string,
-  specifier: string,
-): Place | undefined {
-  const alias = /^[@~]\//.test(specifier);
-  if (!alias && !specifier.startsWith(".")) {
-    return undefined;
-  }
-  const to = place(alias ? join(root, specifier.slice(2)) : resolve(dirname(filename), specifier));
+export function importTarget(filename: string, specifier: string): string | undefined {
+  return specifier.startsWith(".")
+    ? resolve(dirname(filename), specifier)
+    : aliasTarget(filename, specifier, (path) => existsSync(path) || fileAt(path) !== undefined);
+}
+
+/** Returns the module a specifier names from `filename`, or undefined outside the layers or for a package. */
+export function placeOfImport(filename: string, specifier: string): Place | undefined {
+  const target = importTarget(filename, specifier);
+  const to = target === undefined ? undefined : place(target);
   if (!to) {
     return undefined;
   }
@@ -99,3 +107,6 @@ export function placeOfImport(
 /** Returns whether a path inside a feature sits in the feature's own infra/, the adapters only that feature needs. */
 export const isFeatureInfra = (at: Place): boolean =>
   at.layer === "features" && (at.inside === "infra" || at.inside.startsWith("infra/"));
+
+/** Returns whether a path inside a feature is its port: port.ts, or a file in its port/ folder. */
+export const isPort = (at: Place): boolean => at.inside === "port" || at.inside.startsWith("port/");
