@@ -1,7 +1,7 @@
 // This code breaks each typescript.json and solid.json rule that configs.test.ts lists, and the test expects every one
 // of them reported. Long.ts breaks max-lines, which judges a whole file.
 import "./register";
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import tool from "./utils/tool";
 // @ts-ignore
 let count: any = 1;
@@ -96,3 +96,40 @@ export const loose2 = plain == "a";
 if (isOn(true)) console.info("on");
 export const [shared] = createSignal(0);
 export const isMissing = plain == null;
+export function Cells(props: { on: boolean }) {
+  return (
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <Show when={props.on}>
+              <span>
+                <b>{props.on}</b>
+              </span>
+            </Show>
+          </td>
+          <td>
+            <Show when={props.on}>
+              <span />
+            </Show>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+export function Labels(props: { on: boolean }) {
+  return (
+    <>
+      <label>
+        <input type="radio" />
+        <span>
+          <Show when={props.on}>{props.on}</Show>
+        </span>
+      </label>
+      <label>
+        <input type="radio" />
+      </label>
+    </>
+  );
+}

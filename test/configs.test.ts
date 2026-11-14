@@ -66,13 +66,23 @@ await test("a config that extends the presets reports each broken rule of the fi
     "solid(no-accessor-as-prop)",
     "solid(no-unassigned-vars)",
     "jsx-a11y(alt-text)",
+    "jsx-a11y(control-has-associated-label)",
+    "jsx-a11y(label-has-associated-control)",
   ]) {
     assert.match(run.stdout, new RegExp(rule.replace(/[()]/g, "\\$&")), run.stdout + run.stderr);
   }
   // vitest.json judges test files only, so utils/check.ts, which is no test, gets no vitest report.
   assert.doesNotMatch(run.stdout, /utils\/check\.ts:.*vitest/, run.stdout);
-  // eqeqeq keeps == null, so Broken.tsx gets one eqeqeq report, for its == "a" and not its == null.
-  assert.equal(run.stdout.match(/eslint\(eqeqeq\)/g)?.length, 1, run.stdout);
+  // Each of these rules reports exactly once in Broken.tsx. solid.json's two label rules read text 4 levels deep,
+  // through <Show>: of the two cells and the two labels only the one with no text at all is reported. eqeqeq keeps
+  // == null: its report is for == "a", not for == null.
+  for (const rule of [
+    /jsx-a11y\(control-has-associated-label\)/g,
+    /jsx-a11y\(label-has-associated-control\)/g,
+    /eslint\(eqeqeq\)/g,
+  ]) {
+    assert.equal(run.stdout.match(rule)?.length, 1, run.stdout);
+  }
   // typescript.json lets only the logger in shared call console, so a Logger.ts elsewhere is reported.
   assert.doesNotMatch(run.stdout, /shared\/Logger\.ts/, run.stdout);
   assert.match(
