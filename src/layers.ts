@@ -1,73 +1,17 @@
-// The rule `kk-forge/layers`: a file under src/ imports only the layers its own layer may take, and reaches another
-// module only through that module's surface file. A file in the tests/ folder beside src/ may import any layer, also
-// only through the module's surface file.
-import { existsSync, statSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+// The rule `kk-forge/layers`: a file under src/ imports only the layers its own layer may take, and another module
+// only through that module's surface file. A file in the tests/ folder beside src/ may import any layer, through the
+// surface file too. An entities module needs two or more importers among features, orchestration and entities modules,
+// and an orchestration module imports two or more features.
+import { existsSync } from "node:fs";
+import { join, sep } from "node:path";
 
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
-// The layers each layer may import. A feature takes no other feature and an orchestration no other orchestration,
-// so they link through orchestration and entrypoints. Only entrypoints imports infra, which takes entities and shared.
-const allowed = {
-  entrypoints: ["entrypoints", "orchestration", "features", "entities", "shared", "infra"],
-  orchestration: ["features", "entities", "shared"],
-  features: ["entities", "shared"],
-  entities: ["entities", "shared"],
-  shared: ["shared"],
-  infra: ["infra", "entities", "shared"],
-} as const satisfies Record<string, readonly string[]>;
-type Layer = keyof typeof allowed;
+import { moduleProblem } from "./module-counts.js";
+import { allowed, fileAt, type Layer, type Place, place, placeOfImport } from "./places.js";
 
-// A module is a folder directly under its layer, or a file directly under shared or infra.
-const modular = new Set<Layer>([
-  "entrypoints",
-  "orchestration",
-  "features",
-  "entities",
-  "shared",
-  "infra",
-]);
-// A shared module is one file, which is its own surface, or a folder with its own exports.ts.
+/** The layers whose modules another module reaches only through a surface file. */
 const published = new Set<Layer>(["orchestration", "features", "entities", "shared"]);
-
-interface Place {
-  layer: Layer;
-  /** The src/ folder the path sits in. */
-  root: string;
-  /** The module's folder, or its file when the module is one file. */
-  module: string;
-  /** The folder or file name under the layer without the file's extension, which names an entrypoint. */
-  name: string | undefined;
-  /** The path inside the module without its extension, empty for the module itself. */
-  inside: string;
-  /** Whether the module is one file. */
-  file: boolean;
-}
-
-const isLayer = (value: string | undefined): value is Layer =>
-  value !== undefined && Object.hasOwn(allowed, value);
-
-/** Returns where a path sits under src/, or undefined outside the layers. */
-function place(path: string): Place | undefined {
-  const parts = path.split(sep);
-  const src = parts.lastIndexOf("src");
-  const layer = parts[src + 1];
-  if (src < 0 || !isLayer(layer)) {
-    return undefined;
-  }
-  const depth = modular.has(layer) ? src + 3 : src + 2;
-  return {
-    layer,
-    root: parts.slice(0, src + 1).join(sep),
-    module: parts.slice(0, depth).join(sep),
-    name: parts.length === src + 3 ? parts[src + 2]?.replace(/\.[^.]*$/, "") : parts[src + 2],
-    inside: parts
-      .slice(depth)
-      .join("/")
-      .replace(/\.(js|ts|tsx)$/, ""),
-    file: false,
-  };
-}
 
 /**
  * Returns the src/ folder beside the innermost tests/ folder of a path that has one beside it, or undefined when the
@@ -82,17 +26,6 @@ function testedSource(path: string): string | undefined {
     }
   }
   return undefined;
-}
-
-/**
- * Returns the file a path names, as TypeScript finds it: as written, then with .ts, .tsx or .js added, where a
- * written .js or .jsx also names the .ts or .tsx file beside it.
- */
-function fileAt(path: string): string | undefined {
-  const base = path.replace(/\.jsx?$/, "");
-  return [path, `${base}.ts`, `${base}.tsx`, `${base}.js`].find(
-    (file) => existsSync(file) && statSync(file).isFile(),
-  );
 }
 
 /**
@@ -169,24 +102,9 @@ const rule: CreateRule = {
       if (root === undefined || source?.type !== "Literal" || typeof source.value !== "string") {
         return;
       }
-      const specifier = source.value;
-      // Reads the aliases `@/` and `~/` as `root`, the folder the packages map them to.
-      const alias = /^[@~]\//.test(specifier);
-      if (!alias && !specifier.startsWith(".")) {
-        return;
-      }
-      const target = alias
-        ? join(root, specifier.slice(2))
-        : resolve(dirname(context.filename), specifier);
-      const to = place(target);
+      const to = placeOfImport(root, context.filename, source.value);
       if (!to) {
         return;
-      }
-      // An import that names a whole module may name a file module, which TypeScript finds before a folder.
-      const file = to.inside === "" ? fileAt(to.module) : undefined;
-      if (file) {
-        to.module = file;
-        to.file = true;
       }
       const problem = from ? memberProblem(from, to) : testProblem(to);
       if (problem) {
@@ -194,6 +112,12 @@ const rule: CreateRule = {
       }
     };
     return {
+      Program(node) {
+        const problem = from ? moduleProblem(context.filename, from) : undefined;
+        if (problem) {
+          context.report({ node, message: problem });
+        }
+      },
       ImportDeclaration: check,
       ExportNamedDeclaration: check,
       ExportAllDeclaration: check,

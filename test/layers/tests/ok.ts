@@ -9,4 +9,5 @@ import { infra } from "../src/infra/ok";
 import { db } from "../src/infra/db/exports";
 import { start } from "../src/entrypoints/start/ok";
 import { helper } from "./drivers/ok";
+export { lone } from "../src/entities/lone/exports";
 export { a, background, user, flow, logger, log, twin, infra, db, start, helper };
