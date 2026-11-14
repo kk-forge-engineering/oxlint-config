@@ -89,4 +89,4 @@ In both definitions the function's parameters are plain names, with no defaults.
 
 ## Release
 
-Raise `version` in package.json and merge to main. CI publishes to npm once the `production` environment approves.
+Raise `version` in package.json and merge to main. A release that fails code the last release passed, such as a new rule, is a new major. CI publishes to npm once the `production` environment approves.
