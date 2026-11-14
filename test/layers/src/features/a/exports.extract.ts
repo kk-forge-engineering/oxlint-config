@@ -1,1 +1,1 @@
-export const extract = 1;
+export type extract = number;

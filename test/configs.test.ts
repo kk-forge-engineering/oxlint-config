@@ -83,8 +83,11 @@ await test("a config that extends the presets reports each broken rule of the fi
   ]) {
     assert.equal(run.stdout.match(rule)?.length, 1, run.stdout);
   }
-  // typescript.json lets only the logger in shared call console, so a Logger.ts elsewhere is reported.
-  assert.doesNotMatch(run.stdout, /shared\/Logger\.ts/, run.stdout);
+  // typescript.json lets only infra call the console, so a Logger.ts elsewhere is reported.
+  assert.doesNotMatch(run.stdout, /infra\/logger\.ts/, run.stdout);
+  // A feature's infra/ is infra, and a test is not the program, so neither is reported for the console.
+  assert.doesNotMatch(run.stdout, /features\/a\/infra\/sink\.ts:.*no-console/, run.stdout);
+  assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*no-console/, run.stdout);
   assert.match(
     run.stdout,
     /utils\/Logger\.ts:\d+:\d+: .* \[Error\/eslint\(no-console\)\]/,
@@ -122,12 +125,12 @@ await test("the packed package", async (packedPackage) => {
   assert.equal(pack.status, 0, pack.stderr);
   const tarball = join(packed, pack.stdout.trim().split("\n").at(-1) ?? "");
 
-  // Each file under test/layers/src or test/layers/tests named bad-* breaks one
-  // layer rule, and every other file keeps them. The test installs the tarball
-  // outside the repo, so the plugin finds only the dependencies the package
-  // declares. --legacy-peer-deps skips the peers, so the repo's own are used.
+  // Each file under test/layers/src or test/layers/tests named bad-* breaks one rule of layers.json: kk-forge/environment
+  // where it is named bad-env-*, and kk-forge/layers otherwise. Every other file keeps them. The test installs the
+  // tarball outside the repo, so the plugin finds only the dependencies the package declares. --legacy-peer-deps skips
+  // the peers, so the repo's own are used.
   await packedPackage.test(
-    "layers.json reports each import that breaks the layers and nothing else",
+    "layers.json reports each problem of the layers fixture and nothing else",
     () => {
       const installed = join(packed, "layers");
       mkdirSync(installed);
@@ -163,7 +166,10 @@ await test("the packed package", async (packedPackage) => {
           }).map((file) => `${folder}/${file}`),
         )
         .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
-        .map((file) => `${file} kk-forge(layers)`)
+        .map(
+          (file) =>
+            `${file} kk-forge(${basename(file).startsWith("bad-env-") ? "environment" : "layers"})`,
+        )
         .toSorted((left, right) => left.localeCompare(right));
       assert.deepEqual(reports(run.stdout), broken, run.stdout + run.stderr);
     },
@@ -171,7 +177,9 @@ await test("the packed package", async (packedPackage) => {
 
   // test/consumer is a WXT app with Solid that installs the package and extends every preset but vitest.json. Each of
   // those loads the plugin, and the list shows each problem once. Each file named bad-* or in a folder named bad-*
-  // breaks a rule, and so does each file named index.ts outside an entrypoint. Every other file follows the rules.
+  // breaks a rule, and so does each file named index.ts outside an entrypoint. A feature's surface reports in its
+  // exports.ts and its use cases file, so the features badSurface and badEmpty break the rule there. Every other file
+  // follows the rules.
   await packedPackage.test(
     "a WXT app with Solid gets a report for each broken rule and nothing else",
     (context) => {
@@ -214,11 +222,28 @@ await test("the packed package", async (packedPackage) => {
           "src/features/a/bad-feature.ts kk-forge(layers)",
           "src/features/a/bad-side-effect.ts import(no-unassigned-import)",
           "src/features/a/index.ts kk-forge(no-index-files)",
+          "src/features/badEmpty/badEmptyUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.background.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/exports.background.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
           "src/features/list/bad-and.tsx kk-forge(no-conditional-map)",
           "src/features/list/bad-nullish.tsx kk-forge(no-conditional-map)",
           "src/features/list/bad-or.tsx kk-forge(no-conditional-map)",
           "src/features/list/bad-plain.tsx solid(prefer-for)",
           "src/features/list/bad-ternary.tsx kk-forge(no-conditional-map)",
+          "src/features/svg/bad-nested.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-nested.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-path.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-svg-path.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-svg-svg.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-svg.tsx kk-forge(no-inline-svg)",
           "src/index.ts kk-forge(no-index-files)",
           "tests/bad-deep.ts kk-forge(layers)",
         ],

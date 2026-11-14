@@ -12,6 +12,9 @@
     "solid/no-destructure": "error",
     "solid/prefer-for": "error",
     "kk-forge/no-conditional-map": "error",
+    // An icon lives in its own .svg file, imported as a component. A drawing or a chart a project builds in JSX is that
+    // project's exception, with its reason.
+    "kk-forge/no-inline-svg": "error",
     "solid/reactivity": "error",
     "solid/event-handlers": "error",
     "solid/imports": "error",
