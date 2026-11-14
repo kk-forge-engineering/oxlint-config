@@ -27,9 +27,9 @@
     // Solid rule sees.
     "no-unassigned-vars": "off",
     "solid/no-unassigned-vars": "error",
-    // Both rules look for a control's or a label's text 2 levels deep by default. Solid's <Show> and <For> each put a
-    // level between the cell or label and its text, so text two of them deep read as missing. Depth 4 sees through
-    // them and still reports a control or label with no text at all.
+    // Both rules look 2 levels deep by default: for a control's or a label's text, and the label rule also for its
+    // nested control. Solid's <Show> and <For> each put a level in between, so text two of them deep read as
+    // missing. Depth 4 sees through them and still reports a control or label with no text at all.
     "jsx-a11y/control-has-associated-label": ["error", { "depth": 4 }],
     "jsx-a11y/label-has-associated-control": ["error", { "depth": 4 }]
   }
