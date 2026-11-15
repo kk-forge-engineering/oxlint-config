@@ -142,7 +142,10 @@ function takesOptions(params: ParamPattern[], options: string): boolean {
 const destructuresOptions = (params: ParamPattern[], options: string): boolean =>
   takesOptions(params, options) && params[0]?.type === "ObjectPattern";
 
-/** Returns the constructor's parameters of a class, or undefined when it declares no constructor. */
+/**
+ * Returns the parameters of the constructor a class runs, or undefined when it declares no constructor with a body,
+ * as when it lists only signatures.
+ */
 function constructorParams(declaration: Class): ParamPattern[] | undefined {
   for (const member of declaration.body.body) {
     // An overloaded constructor lists its signatures first. The one with a body is the constructor that runs.

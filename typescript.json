@@ -69,11 +69,16 @@
   "overrides": [
     {
       // A test is not the program, so it may print, as core.md exempts it from the environment rules. A string of HTML
-      // it sets up runs in no page a user sees.
+      // it sets up runs in no page a user sees, so it may set innerHTML. A native dialog stays banned there as anywhere.
       "files": ["**/*.test.*", "**/*.spec.*", "**/tests/**"],
       "rules": {
         "no-console": "off",
-        "eslint/no-restricted-properties": "off"
+        "eslint/no-restricted-properties": [
+          "error",
+          { "object": "self", "property": "alert" },
+          { "object": "self", "property": "confirm" },
+          { "object": "self", "property": "prompt" }
+        ]
       }
     },
     {
