@@ -3,11 +3,11 @@
 // is the feature's folder name, built by its factory `new<X>UseCases(options: <X>UseCasesOptions)`. The check follows
 // each name the surface exports to its declaration, through the files it is re-exported from, so a name passes only on
 // what its declaration shows.
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import type { Class, Declaration, ParamPattern } from "oxc-parser";
 
-import { exportsOf, isDeclaration, type Kind, programOf, type Read } from "./exported-names.js";
+import { exportsOf, isDeclaration, type Kind, programOf } from "./exported-names.js";
 import type { Place } from "./places.js";
 
 /** A problem the check reports, by the offsets of the export it reports on. */
@@ -66,6 +66,7 @@ function runtimeAfter(inside: string, prefix: string): string | undefined | null
 const what: Record<Kind, string> = {
   type: "a type",
   component: "a component",
+  error: "an error class",
   class: "a class",
   function: "a free function",
   value: "a value",
@@ -84,9 +85,9 @@ function exportProblems({
   text: string;
 }): SurfaceProblem[] {
   const feature = `features/${basename(from.module)}`;
-  const gives = `the surface of ${feature} gives out only its components, ${names.useCases} and types`;
-  const read: Read = { exports: new Map(), linted: { file: filename, text } };
-  return exportsOf(filename, read).flatMap(({ name, start, end, declared }): SurfaceProblem[] => {
+  const gives = `the surface of ${feature} gives out only its components, ${names.useCases}, its error classes and types`;
+  const exported = exportsOf({ file: filename, text, feature: from.module });
+  return exported.flatMap(({ name, start, end, declared }): SurfaceProblem[] => {
     if (declared === undefined) {
       return [
         {
@@ -96,7 +97,8 @@ function exportProblems({
         },
       ];
     }
-    if (declared.kind === "type" || declared.kind === "component") {
+    // An error class is part of the feature's contract, which a caller matches with instanceof.
+    if (declared.kind === "type" || declared.kind === "component" || declared.kind === "error") {
       return [];
     }
     const isUseCases =
@@ -107,15 +109,13 @@ function exportProblems({
         ? []
         : [{ start, end, message: `${name} goes in ${feature}/${basename(names.file)}.` }];
     }
-    return [
-      {
-        start,
-        end,
-        message:
-          `${name} is ${what[declared.kind]}, and ${gives}: make it a method of ${names.useCases}, or a component ` +
-          "that declares its return type JSX.Element, or keep it inside the feature.",
-      },
-    ];
+    const instead =
+      declared.kind === "class"
+        ? `make it ${names.useCases}, an error class that extends Error or another error class of the feature, ` +
+          "or keep it inside the feature."
+        : `make it a method of ${names.useCases}, or a component that declares its return type JSX.Element, or ` +
+          "keep it inside the feature.";
+    return [{ start, end, message: `${name} is ${what[declared.kind]}, and ${gives}: ${instead}` }];
   });
 }
 
@@ -132,6 +132,13 @@ function takesOptions(params: ParamPattern[], options: string): boolean {
     type.typeName.name === options
   );
 }
+
+/**
+ * Returns whether a constructor takes the options as one destructured object, as in
+ * `{ retries, ...deps }: TextsUseCasesOptions`, so each setting and the deps leave it by name.
+ */
+const destructuresOptions = (params: ParamPattern[], options: string): boolean =>
+  takesOptions(params, options) && params[0]?.type === "ObjectPattern";
 
 /** Returns the constructor's parameters of a class, or undefined when it declares no constructor. */
 function constructorParams(declaration: Class): ParamPattern[] | undefined {
@@ -182,7 +189,7 @@ function useCasesProblems(names: UseCasesNames, text: string): SurfaceProblem[] 
     const at = { start: statement.start, end: statement.end };
     if (declaration.type === "ClassDeclaration" && declaration.id?.name === names.useCases) {
       hasClass = true;
-      if (!takesOptions(constructorParams(declaration) ?? [], names.options)) {
+      if (!destructuresOptions(constructorParams(declaration) ?? [], names.options)) {
         problems.push({
           ...at,
           message: `${names.useCases} takes its options in its constructor: constructor({ ...deps }: ${names.options}).`,
@@ -202,8 +209,8 @@ function useCasesProblems(names: UseCasesNames, text: string): SurfaceProblem[] 
     }
   }
   // Every export form counts, a re-export and `export { helper }` included, so the file's exports come from exportsOf.
-  const read: Read = { exports: new Map(), linted: { file: names.file, text } };
-  for (const { name, start, end, declared } of exportsOf(names.file, read)) {
+  const exported = exportsOf({ file: names.file, text, feature: dirname(names.file) });
+  for (const { name, start, end, declared } of exported) {
     if (name !== names.useCases && name !== names.factory && declared?.kind !== "type") {
       problems.push({
         start,

@@ -178,8 +178,8 @@ await test("the packed package", async (packedPackage) => {
   // test/consumer is a WXT app with Solid that installs the package and extends every preset but vitest.json. Each of
   // those loads the plugin, and the list shows each problem once. Each file named bad-* or in a folder named bad-*
   // breaks a rule, and so does each file named index.ts outside an entrypoint. A feature's surface reports in its
-  // exports.ts and its use cases file, so the features badSurface and badEmpty break the rule there. Every other file
-  // follows the rules.
+  // exports.ts and its use cases file, so the features badSurface, badEmpty and badIdentifier break the rule there.
+  // Every other file follows the rules.
   await packedPackage.test(
     "a WXT app with Solid gets a report for each broken rule and nothing else",
     (context) => {
@@ -223,12 +223,16 @@ await test("the packed package", async (packedPackage) => {
           "src/features/a/bad-side-effect.ts import(no-unassigned-import)",
           "src/features/a/index.ts kk-forge(no-index-files)",
           "src/features/badEmpty/badEmptyUseCases.ts kk-forge(layers)",
+          "src/features/badIdentifier/badIdentifierUseCases.ts kk-forge(layers)",
           "src/features/badSurface/badSurfaceUseCases.background.ts kk-forge(layers)",
           "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
           "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
           "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
           "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
           "src/features/badSurface/exports.background.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
           "src/features/badSurface/exports.ts kk-forge(layers)",
           "src/features/badSurface/exports.ts kk-forge(layers)",
           "src/features/badSurface/exports.ts kk-forge(layers)",

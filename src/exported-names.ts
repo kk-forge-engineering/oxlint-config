@@ -1,10 +1,12 @@
-// Reads which names a TypeScript file exports and what each one is, as its declaration shows: a type, a component, a
-// class, a function or another value. It follows a re-export and an import through the files they name, so a name a
-// surface passes on from another file is judged by its declaration there.
+// Reads which names a TypeScript file exports and what each one is, as its declaration shows: a type, a component, an
+// error class, another class, a function or another value. It follows a re-export and an import through the files they
+// name, so a name a surface passes on from another file is judged by its declaration there.
 import { readFileSync, statSync } from "node:fs";
+import { sep } from "node:path";
 
 import {
   type BindingPattern,
+  type Class,
   type Declaration,
   type ExportAllDeclaration,
   type ExportDefaultDeclarationKind,
@@ -18,7 +20,7 @@ import {
 import { fileAt, importTarget } from "./places.js";
 
 /** What an exported name is, as its declaration shows. */
-export type Kind = "type" | "component" | "class" | "function" | "value";
+export type Kind = "type" | "component" | "error" | "class" | "function" | "value";
 
 /** A name's declaration: what it is, and the file that declares it. */
 export interface Declared {
@@ -71,8 +73,52 @@ function isJsxElement(returnType: TSTypeAnnotation | null | undefined): boolean 
   );
 }
 
+/** The file a declaration sits in, its program, and what the check has read so far. */
+interface Scope {
+  file: string;
+  program: Program;
+  read: Read;
+}
+
+/** Returns whether a file's top level declares or imports a name. */
+function binds(program: Program, name: string): boolean {
+  return program.body.some((statement) => {
+    if (statement.type === "ImportDeclaration") {
+      return statement.specifiers.some((specifier) => specifier.local.name === name);
+    }
+    const declaration =
+      statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
+    return (
+      declaration !== null &&
+      isDeclaration(declaration) &&
+      declarationNames(declaration).includes(name)
+    );
+  });
+}
+
+/**
+ * Returns whether a class is an error class: it extends the global `Error`, or an error class that a file of the same
+ * feature declares, followed through its imports. A parent the check cannot read, such as a package's class or an
+ * expression, makes no error class.
+ */
+function classKind(node: Class, scope: Scope): Kind {
+  const parent = node.superClass;
+  const inFeature = (file: string) => file.startsWith(scope.read.feature + sep);
+  // The feature's own error classes pass, never one it passes on from shared or entities.
+  if (parent?.type !== "Identifier" || scope.read.classes.has(node) || !inFeature(scope.file)) {
+    return "class";
+  }
+  if (!binds(scope.program, parent.name)) {
+    return parent.name === "Error" ? "error" : "class";
+  }
+  scope.read.classes.add(node);
+  const declared = localDeclaration({ ...scope, name: parent.name });
+  scope.read.classes.delete(node);
+  return declared?.kind === "error" && inFeature(declared.file) ? "error" : "class";
+}
+
 /** Returns what a declared function, class or initial value is. */
-function kindOf(node: ExportDefaultDeclarationKind | null): Kind {
+function kindOf(node: ExportDefaultDeclarationKind | null, scope: Scope): Kind {
   const type = node?.type;
   if (
     type === "FunctionDeclaration" ||
@@ -82,8 +128,8 @@ function kindOf(node: ExportDefaultDeclarationKind | null): Kind {
   ) {
     return isJsxElement(node?.returnType) ? "component" : "function";
   }
-  if (type === "ClassDeclaration" || type === "ClassExpression") {
-    return "class";
+  if (node?.type === "ClassDeclaration" || node?.type === "ClassExpression") {
+    return classKind(node, scope);
   }
   return type === "TSInterfaceDeclaration" ? "type" : "value";
 }
@@ -112,13 +158,21 @@ function bindingNames(pattern: BindingPattern): string[] {
   }
 }
 
+/** Returns the names a declaration declares. */
+function declarationNames(declaration: Declaration): string[] {
+  if (declaration.type === "VariableDeclaration") {
+    return declaration.declarations.flatMap((declarator) => bindingNames(declarator.id));
+  }
+  return declaration.id?.type === "Identifier" ? [declaration.id.name] : [];
+}
+
 /** Returns each name a declaration declares, with what it is. */
-export function declarationKinds(declaration: Declaration): [string, Kind][] {
+function declarationKinds(declaration: Declaration, scope: Scope): [string, Kind][] {
   if (declaration.type === "VariableDeclaration") {
     return declaration.declarations.flatMap((declarator) =>
       bindingNames(declarator.id).map((name): [string, Kind] => [
         name,
-        declarator.id.type === "Identifier" ? kindOf(declarator.init) : "value",
+        declarator.id.type === "Identifier" ? kindOf(declarator.init, scope) : "value",
       ]),
     );
   }
@@ -127,15 +181,17 @@ export function declarationKinds(declaration: Declaration): [string, Kind][] {
     declaration.type === "TSDeclareFunction" ||
     declaration.type === "ClassDeclaration"
   ) {
-    return declaration.id === null ? [] : [[declaration.id.name, kindOf(declaration)]];
+    return declaration.id === null ? [] : [[declaration.id.name, kindOf(declaration, scope)]];
   }
   if (
     declaration.type === "TSTypeAliasDeclaration" ||
-    declaration.type === "TSInterfaceDeclaration"
+    declaration.type === "TSInterfaceDeclaration" ||
+    declaration.type === "TSEnumDeclaration"
   ) {
+    // An enum is a type, whose members are its values, as a Go constant is a value of its type.
     return [[declaration.id.name, "type"]];
   }
-  // An enum, a namespace and `import x = require()` are values, which the check does not follow further.
+  // A namespace and `import x = require()` are values, which the check does not follow further.
   return declaration.id?.type === "Identifier" ? [[declaration.id.name, "value"]] : [];
 }
 
@@ -149,14 +205,16 @@ function importedDeclaration(
   if (source === undefined) {
     return undefined;
   }
-  return exportsOf(source, read).find((exported) => exported.name === name)?.declared;
+  return readExports(source, read).find((exported) => exported.name === name)?.declared;
 }
 
 /** Returns the declaration of a name the file's top level declares or imports, or undefined when it cannot be read. */
-function localDeclaration(
-  { file, program, name }: { file: string; program: Program; name: string },
-  read: Read,
-): Declared | undefined {
+function localDeclaration({
+  file,
+  program,
+  read,
+  name,
+}: Scope & { name: string }): Declared | undefined {
   for (const statement of program.body) {
     if (statement.type === "ImportDeclaration") {
       for (const specifier of statement.specifiers) {
@@ -183,10 +241,17 @@ function localDeclaration(
     }
     const declaration =
       statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-    if (declaration === null || !isDeclaration(declaration)) {
+    // Only the declaration of the name is read, so a chain of classes in one file is followed once per class.
+    if (
+      declaration === null ||
+      !isDeclaration(declaration) ||
+      !declarationNames(declaration).includes(name)
+    ) {
       continue;
     }
-    const kind = declarationKinds(declaration).find(([declared]) => declared === name)?.[1];
+    const kind = declarationKinds(declaration, { file, program, read }).find(
+      ([declared]) => declared === name,
+    )?.[1];
     if (kind !== undefined) {
       return { kind, file };
     }
@@ -213,9 +278,13 @@ export const isDeclaration = (node: Program["body"][number]): node is Declaratio
  * The exports of each file one check has read, and the text of the linted file. A file still being read maps to none,
  * so a cycle of imports ends there.
  */
-export interface Read {
+interface Read {
   exports: Map<string, Exported[]>;
   linted: { file: string; text: string };
+  /** The feature's folder, inside which the check follows a class to its parent error class. */
+  feature: string;
+  /** The classes whose parent the check is following, so a cycle of `extends` ends. */
+  classes: Set<Class>;
 }
 
 /** Returns the names an `export { … }` or `export <declaration>` statement exports, with their declarations. */
@@ -229,7 +298,7 @@ function namedExports(
 ): Exported[] {
   const at = { start: statement.start, end: statement.end };
   if (statement.declaration !== null) {
-    return declarationKinds(statement.declaration).map(([name, kind]) => ({
+    return declarationKinds(statement.declaration, { file, program, read }).map(([name, kind]) => ({
       name,
       ...at,
       declared: { kind: statement.exportKind === "type" ? "type" : kind, file },
@@ -241,7 +310,7 @@ function namedExports(
     const declared: Declared | undefined = isType
       ? { kind: "type", file }
       : statement.source === null
-        ? localDeclaration({ file, program, name: local }, read)
+        ? localDeclaration({ file, program, read, name: local })
         : importedDeclaration({ file, specifier: statement.source.value, name: local }, read);
     return {
       name: nameOf(specifier.exported),
@@ -269,13 +338,13 @@ function allExports(
   if (source === undefined) {
     return [{ name: `* from ${statement.source.value}`, ...at, declared: undefined }];
   }
-  return exportsOf(source, read)
+  return readExports(source, read)
     .filter((each) => each.name !== "default")
     .map((each) => ({ ...each, ...at }));
 }
 
-/** Returns each name a file exports, with its declaration. */
-export function exportsOf(file: string, read: Read): Exported[] {
+/** Returns each name a file exports, with its declaration, reading on from what this check has read. */
+function readExports(file: string, read: Read): Exported[] {
   const known = read.exports.get(file);
   if (known) {
     return known;
@@ -295,10 +364,31 @@ export function exportsOf(file: string, read: Read): Exported[] {
     const { declaration } = statement;
     const declared: Declared | undefined =
       declaration.type === "Identifier"
-        ? localDeclaration({ file, program, name: declaration.name }, read)
-        : { kind: kindOf(declaration), file };
+        ? localDeclaration({ file, program, read, name: declaration.name })
+        : { kind: kindOf(declaration, { file, program, read }), file };
     return [{ name: "default", start: statement.start, end: statement.end, declared }];
   });
   read.exports.set(file, exported);
   return exported;
+}
+
+/**
+ * Returns each name a file exports, with its declaration. `text` is the file's text as the linter holds it. `feature`
+ * is the feature's folder, inside which a class is followed to its parent error class.
+ */
+export function exportsOf({
+  file,
+  text,
+  feature,
+}: {
+  file: string;
+  text: string;
+  feature: string;
+}): Exported[] {
+  return readExports(file, {
+    exports: new Map(),
+    linted: { file, text },
+    feature,
+    classes: new Set(),
+  });
 }

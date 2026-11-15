@@ -1,3 +1,5 @@
 export { BPanel } from "./BPanel";
 export { BUseCases, type BUseCasesOptions, newBUseCases } from "./bUseCases";
-export type { Count } from "./count";
+export { type Count, Unit } from "./count";
+export { BError, BLimitError } from "./errors";
+export { BMissingError } from "./missing";
