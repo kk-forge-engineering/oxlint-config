@@ -4,6 +4,8 @@ export type BContentScriptUseCasesOptions = { retries: number };
 export class BContentScriptUseCases {
   private readonly retries: number;
 
+  // An overload's signature comes first, and the check reads the constructor with a body.
+  constructor(options: BContentScriptUseCasesOptions);
   constructor({ retries }: BContentScriptUseCasesOptions) {
     this.retries = retries;
   }

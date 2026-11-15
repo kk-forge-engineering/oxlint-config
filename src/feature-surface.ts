@@ -145,7 +145,12 @@ const destructuresOptions = (params: ParamPattern[], options: string): boolean =
 /** Returns the constructor's parameters of a class, or undefined when it declares no constructor. */
 function constructorParams(declaration: Class): ParamPattern[] | undefined {
   for (const member of declaration.body.body) {
-    if (member.type === "MethodDefinition" && member.kind === "constructor") {
+    // An overloaded constructor lists its signatures first. The one with a body is the constructor that runs.
+    if (
+      member.type === "MethodDefinition" &&
+      member.kind === "constructor" &&
+      member.value.body !== null
+    ) {
       return member.value.params;
     }
   }
@@ -255,5 +260,9 @@ export function surfaceProblems({
   }
   const fileRuntime = runtimeAfter(from.inside, `${basename(from.module)}UseCases`);
   const own = fileRuntime === null ? undefined : useCasesNames(from.module, fileRuntime);
+  if (own !== undefined && filename === own.file.replace(/\.ts$/, ".tsx")) {
+    const message = `The use cases hold no JSX, so their file is ${basename(own.file)}, not ${basename(filename)}.`;
+    return [{ start: 0, end: 0, message }];
+  }
   return own?.file === filename ? useCasesProblems(own, text) : [];
 }

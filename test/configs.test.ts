@@ -94,6 +94,9 @@ await test("a config that extends the presets reports each broken rule of the fi
   // A feature's infra/ is infra, and a test is not the program, so neither is reported for the console.
   assert.doesNotMatch(run.stdout, /features\/a\/infra\/sink\.ts:.*no-console/, run.stdout);
   assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*no-console/, run.stdout);
+  assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*no-restricted-properties/, run.stdout);
+  // no-alert reads window and globalThis, and no-restricted-properties catches the dialogs on self.
+  assert.match(run.stdout, /Broken\.tsx:\d+:\d+: 'self\.prompt' is restricted/, run.stdout);
   assert.match(
     run.stdout,
     /utils\/Logger\.ts:\d+:\d+: .* \[Error\/eslint\(no-console\)\]/,
@@ -184,7 +187,7 @@ await test("the packed package", async (packedPackage) => {
   // test/consumer is a WXT app with Solid that extends every preset but
   // vitest.json. Each file named bad-* or in a bad-* folder breaks a rule, as
   // does each index.ts outside an entrypoint. The features badSurface,
-  // badEmpty and badIdentifier report in exports.ts and the use cases file.
+  // badEmpty, badIdentifier and badTsx report in exports.ts and the use cases file.
   await packedPackage.test(
     "a WXT app with Solid gets a report for each broken rule and nothing else",
     (context) => {
@@ -242,6 +245,7 @@ await test("the packed package", async (packedPackage) => {
           "src/features/badSurface/exports.ts kk-forge(layers)",
           "src/features/badSurface/exports.ts kk-forge(layers)",
           "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badTsx/badTsxUseCases.tsx kk-forge(layers)",
           "src/features/list/bad-and.tsx kk-forge(no-conditional-map)",
           "src/features/list/bad-nullish.tsx kk-forge(no-conditional-map)",
           "src/features/list/bad-or.tsx kk-forge(no-conditional-map)",

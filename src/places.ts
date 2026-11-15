@@ -68,12 +68,12 @@ export function place(path: string): Place | undefined {
 }
 
 /**
- * Returns the file a path names, or undefined. Like TypeScript, it tries the path as written, then with .ts, .tsx or
- * .js in place of any .js or .jsx.
+ * Returns the file a path names, or undefined. Like TypeScript, it tries the path as written, then with .ts, .tsx,
+ * .d.ts or .js in place of any .js or .jsx.
  */
 export function fileAt(path: string): string | undefined {
   const base = path.replace(/\.jsx?$/, "");
-  return [path, `${base}.ts`, `${base}.tsx`, `${base}.js`].find(
+  return [path, `${base}.ts`, `${base}.tsx`, `${base}.d.ts`, `${base}.js`].find(
     (file) => existsSync(file) && statSync(file).isFile(),
   );
 }

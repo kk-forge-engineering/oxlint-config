@@ -11,20 +11,16 @@
   "rules": {
     // A native dialog blocks the page and cannot be styled or tested: a library's window replaces it.
     "eslint/no-alert": "error",
+    // A string of HTML would run in the page, so the text goes in as nodes. no-alert reads window and globalThis, and
+    // self names the same global object, so its dialogs are listed here. oxlint prints no message of its own for these.
     "eslint/no-restricted-properties": [
       "error",
-      {
-        "property": "innerHTML",
-        "message": "A string of HTML would run in the page: insert the text as nodes."
-      },
-      {
-        "property": "outerHTML",
-        "message": "A string of HTML would run in the page: insert the text as nodes."
-      },
-      {
-        "property": "insertAdjacentHTML",
-        "message": "A string of HTML would run in the page: insert the text as nodes."
-      }
+      { "property": "innerHTML" },
+      { "property": "outerHTML" },
+      { "property": "insertAdjacentHTML" },
+      { "object": "self", "property": "alert" },
+      { "object": "self", "property": "confirm" },
+      { "object": "self", "property": "prompt" }
     ],
     "typescript/no-explicit-any": "error",
     "typescript/ban-ts-comment": "error",
@@ -72,10 +68,12 @@
   },
   "overrides": [
     {
-      // A test is not the program, so it may print, as core.md exempts it from the environment rules.
+      // A test is not the program, so it may print, as core.md exempts it from the environment rules. A string of HTML
+      // it sets up runs in no page a user sees.
       "files": ["**/*.test.*", "**/*.spec.*", "**/tests/**"],
       "rules": {
-        "no-console": "off"
+        "no-console": "off",
+        "eslint/no-restricted-properties": "off"
       }
     },
     {

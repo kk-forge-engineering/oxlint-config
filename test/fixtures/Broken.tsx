@@ -16,6 +16,7 @@ export function dialogs(target: HTMLElement) {
   if (window.confirm("Clear?")) {
     target.innerHTML = "";
   }
+  self.prompt("Name?");
 }
 export function loop(limit: number) {
   let left = 0;
