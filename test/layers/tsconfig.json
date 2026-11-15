@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.paths.json" } // the fixtures inherit their aliases, and the file ends in this comment

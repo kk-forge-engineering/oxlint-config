@@ -1,1 +1,1 @@
-export const popupPage = 1;
+export type popupPage = number;

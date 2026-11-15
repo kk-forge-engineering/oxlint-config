@@ -9,6 +9,15 @@ Promise.resolve(count);
 export function Broken(props: { html: string }) {
   return <div innerHTML={props.html} />;
 }
+export function StaticHtml() {
+  return <div innerHTML="<b>static</b>" />;
+}
+export function dialogs(target: HTMLElement) {
+  if (window.confirm("Clear?")) {
+    target.innerHTML = "";
+  }
+  self.prompt("Name?");
+}
 export function loop(limit: number) {
   let left = 0;
   while (left < limit) {

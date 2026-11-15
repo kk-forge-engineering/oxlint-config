@@ -6,9 +6,10 @@ import { basename, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-// oxlint runs with no flags in a folder whose config only extends typescript.json, solid.json and vitest.json, as a
-// consumer's does. So the run also shows that typeAware and denyWarnings reach it through extends, and that solid.json
-// finds the plugin from the package's folder.
+// The test runs oxlint with no flags in fixtures/, whose config only extends
+// typescript.json, solid.json and vitest.json, as a consumer's config does.
+// So the run also shows that typeAware and denyWarnings reach it through
+// extends, and that solid.json finds the plugin from the package's folder.
 await test("a config that extends the presets reports each broken rule of the fixture", () => {
   const run = spawnSync("npx", ["oxlint", "--format", "unix"], {
     cwd: new URL("fixtures", import.meta.url),
@@ -60,6 +61,8 @@ await test("a config that extends the presets reports each broken rule of the fi
     "eslint(eqeqeq)",
     "eslint(curly)",
     "eslint(max-lines)",
+    "eslint(no-alert)",
+    "eslint(no-restricted-properties)",
     "solid(no-module-scope-reactive-primitive)",
     "solid(validate-jsx-nesting)",
     "solid(no-unused-signal)",
@@ -83,8 +86,19 @@ await test("a config that extends the presets reports each broken rule of the fi
   ]) {
     assert.equal(run.stdout.match(rule)?.length, 1, run.stdout);
   }
-  // typescript.json lets only the logger in shared call console, so a Logger.ts elsewhere is reported.
-  assert.doesNotMatch(run.stdout, /shared\/Logger\.ts/, run.stdout);
+  // solid.json forbids innerHTML even with a static HTML string, so the
+  // test expects both innerHTML uses in Broken.tsx to be reported.
+  assert.equal(run.stdout.match(/solid\(no-innerhtml\)/g)?.length, 2, run.stdout);
+  // typescript.json lets only infra call the console, so a Logger.ts elsewhere is reported.
+  assert.doesNotMatch(run.stdout, /infra\/logger\.ts/, run.stdout);
+  // A feature's infra/ is infra, and a test is not the program, so neither is reported for the console.
+  assert.doesNotMatch(run.stdout, /features\/a\/infra\/sink\.ts:.*no-console/, run.stdout);
+  assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*no-console/, run.stdout);
+  // A test may set innerHTML, but a native dialog is banned there too.
+  assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*'innerHTML'/, run.stdout);
+  assert.match(run.stdout, /Console\.test\.ts:\d+:\d+: 'self\.confirm' is restricted/, run.stdout);
+  // no-alert reads window and globalThis, and no-restricted-properties catches the dialogs on self.
+  assert.match(run.stdout, /Broken\.tsx:\d+:\d+: 'self\.prompt' is restricted/, run.stdout);
   assert.match(
     run.stdout,
     /utils\/Logger\.ts:\d+:\d+: .* \[Error\/eslint\(no-console\)\]/,
@@ -122,12 +136,12 @@ await test("the packed package", async (packedPackage) => {
   assert.equal(pack.status, 0, pack.stderr);
   const tarball = join(packed, pack.stdout.trim().split("\n").at(-1) ?? "");
 
-  // Each file under test/layers/src or test/layers/tests named bad-* breaks one
-  // layer rule, and every other file keeps them. The test installs the tarball
-  // outside the repo, so the plugin finds only the dependencies the package
-  // declares. --legacy-peer-deps skips the peers, so the repo's own are used.
+  // Each file under test/layers/src or test/layers/tests named bad-* breaks one rule of layers.json: kk-forge/environment
+  // where it is named bad-env-*, and kk-forge/layers otherwise. Every other file keeps them. The test installs the
+  // tarball outside the repo, so the plugin finds only the dependencies the package declares. --legacy-peer-deps skips
+  // the peers, so the repo's own are used.
   await packedPackage.test(
-    "layers.json reports each import that breaks the layers and nothing else",
+    "layers.json reports each problem of the layers fixture and nothing else",
     () => {
       const installed = join(packed, "layers");
       mkdirSync(installed);
@@ -163,15 +177,19 @@ await test("the packed package", async (packedPackage) => {
           }).map((file) => `${folder}/${file}`),
         )
         .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
-        .map((file) => `${file} kk-forge(layers)`)
+        .map(
+          (file) =>
+            `${file} kk-forge(${basename(file).startsWith("bad-env-") ? "environment" : "layers"})`,
+        )
         .toSorted((left, right) => left.localeCompare(right));
       assert.deepEqual(reports(run.stdout), broken, run.stdout + run.stderr);
     },
   );
 
-  // test/consumer is a WXT app with Solid that installs the package and extends every preset but vitest.json. Each of
-  // those loads the plugin, and the list shows each problem once. Each file named bad-* or in a folder named bad-*
-  // breaks a rule, and so does each file named index.ts outside an entrypoint. Every other file follows the rules.
+  // test/consumer is a WXT app with Solid that extends every preset but
+  // vitest.json. Each file named bad-* or in a bad-* folder breaks a rule, as
+  // does each index.ts outside an entrypoint. The features badSurface,
+  // badEmpty, badIdentifier and badTsx report in exports.ts and the use cases file.
   await packedPackage.test(
     "a WXT app with Solid gets a report for each broken rule and nothing else",
     (context) => {
@@ -214,11 +232,33 @@ await test("the packed package", async (packedPackage) => {
           "src/features/a/bad-feature.ts kk-forge(layers)",
           "src/features/a/bad-side-effect.ts import(no-unassigned-import)",
           "src/features/a/index.ts kk-forge(no-index-files)",
+          "src/features/badEmpty/badEmptyUseCases.ts kk-forge(layers)",
+          "src/features/badIdentifier/badIdentifierUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.background.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/badSurfaceUseCases.ts kk-forge(layers)",
+          "src/features/badSurface/exports.background.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badSurface/exports.ts kk-forge(layers)",
+          "src/features/badTsx/badTsxUseCases.tsx kk-forge(layers)",
           "src/features/list/bad-and.tsx kk-forge(no-conditional-map)",
           "src/features/list/bad-nullish.tsx kk-forge(no-conditional-map)",
           "src/features/list/bad-or.tsx kk-forge(no-conditional-map)",
           "src/features/list/bad-plain.tsx solid(prefer-for)",
           "src/features/list/bad-ternary.tsx kk-forge(no-conditional-map)",
+          "src/features/svg/bad-nested.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-nested.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-path.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-svg-path.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-svg-svg.tsx kk-forge(no-inline-svg)",
+          "src/features/svg/bad-svg.tsx kk-forge(no-inline-svg)",
           "src/index.ts kk-forge(no-index-files)",
           "tests/bad-deep.ts kk-forge(layers)",
         ],

@@ -6,18 +6,20 @@ import { basename, dirname, join, relative } from "node:path";
 
 import { parseSync } from "oxc-parser";
 
-import { type Layer, type Place, placeOfImport } from "./places.js";
+import {
+  declarationFile,
+  fileAt,
+  type Layer,
+  type Place,
+  placeOfImport,
+  testFile,
+} from "./places.js";
 
-// The checks count no import from an entrypoint or an infra adapter. Such an import uses the entity for a feature: the
-// entrypoint can take the type from the surface of that feature, and the adapter stays generic behind its port. shared
-// imports no entity.
+// The checks count no import from an entrypoint, which takes an entity's type from a feature's surface. A feature's
+// infra/ sits in its feature, so its imports count as the feature's. The root infra and shared import no entity.
 const consumerLayers: readonly Layer[] = ["features", "orchestration", "entities"];
 
 const sourceFile = /\.[cm]?[jt]sx?$/;
-const declarationFile = /\.d\.[cm]?ts$/;
-// The checks skip a test file. A test follows its code, so it makes no consumer and adds no feature to an orchestration
-// module.
-const testFile = /\.(test|spec)\.[cm]?[jt]sx?$/;
 // The checks count a dynamic import only when a string literal, or a template literal without a placeholder, names its
 // module.
 const literal = /^(["'`])([^"'`$]*)\1$/;
@@ -53,6 +55,8 @@ function sourceFiles(dir: string): string[] {
     if (entry.isDirectory()) {
       return entry.name === "node_modules" || entry.name.startsWith(".") ? [] : sourceFiles(path);
     }
+    // The checks skip a test file. A test follows its code, so it makes no consumer and adds no feature to an
+    // orchestration module.
     return entry.isFile() && sourceFile.test(entry.name) && !testFile.test(entry.name)
       ? [path]
       : [];
@@ -79,7 +83,7 @@ function importedModules(root: string, file: string): Target[] {
     }),
   ];
   const targets = specifiers.flatMap((specifier) => {
-    const to = placeOfImport(root, file, specifier);
+    const to = placeOfImport(file, specifier);
     return to ? [{ layer: to.layer, module: to.module }] : [];
   });
   imports.set(file, { mtimeMs, size, targets });
@@ -212,4 +216,16 @@ export function moduleProblem(filename: string, from: Place): string | undefined
     return undefined;
   }
   return from.layer === "entities" ? entityProblem(from) : orchestrationProblem(from);
+}
+
+/**
+ * Returns the entities modules a feature's port imports, the port being `port.ts` or the files under `port/` in the
+ * feature module `feature`. The feature's infra imports only these entities.
+ */
+export function portEntities(root: string, feature: string): string[] {
+  const file = fileAt(join(feature, "port"));
+  const files = file === undefined ? sourceFiles(join(feature, "port")) : [file];
+  return files.flatMap((portFile) =>
+    importedModules(root, portFile).flatMap((to) => (to.layer === "entities" ? [to.module] : [])),
+  );
 }

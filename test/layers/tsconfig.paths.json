@@ -1,0 +1,4 @@
+{
+  // The aliases the fixtures import through. tsconfig.json inherits them, so a guard reads them through extends.
+  "compilerOptions": { "paths": { "@/*": ["./src/*"], "~/*": ["./src/*"], }, },
+}

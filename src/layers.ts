@@ -1,21 +1,26 @@
 // The rule `kk-forge/layers`: a file under src/ imports only the layers its own layer may take, and another module
 // only through that module's surface file. A file in the tests/ folder beside src/ may import any layer, through the
 // surface file too. An entities module needs two or more importers among features, orchestration and entities modules,
-// and an orchestration module imports two or more features.
+// and an orchestration module imports two or more features. A feature's surface gives out its components, its use
+// cases and types, which src/feature-surface.ts checks.
 import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
 
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
-import { moduleProblem } from "./module-counts.js";
+import { surfaceProblems } from "./feature-surface.js";
+import { moduleProblem, portEntities } from "./module-counts.js";
 import {
   allowed,
+  declarationFile,
   fileAt,
   isFeatureInfra,
+  isPort,
   type Layer,
   type Place,
   place,
   placeOfImport,
+  testFile,
 } from "./places.js";
 
 /** The layers whose modules another module reaches only through a surface file. */
@@ -49,9 +54,11 @@ function isSurface(to: Place): boolean {
   return existsSync(path) || fileAt(path) !== undefined;
 }
 
+/** The layers a feature's infra imports beyond its own feature. */
+const featureInfraLayers: readonly Layer[] = ["entities", "infra", "shared"];
+
 /** Returns why a test's import of module `to` breaks its surface, or undefined when it takes a surface. */
 function testProblem(to: Place): string | undefined {
-  // A feature's infra/ is the feature's second surface, reached through its own exports.ts.
   if (isFeatureInfra(to)) {
     return to.inside === "infra/exports"
       ? undefined
@@ -66,26 +73,54 @@ function testProblem(to: Place): string | undefined {
     : "A test imports a module only through its exports.ts or exports.<entrypoint>.ts.";
 }
 
-/** Returns why a file under src/ may not import module `to`, or undefined when it may. */
-function memberProblem(from: Place, to: Place): string | undefined {
+/**
+ * Returns why a file under src/ may not import module `to`, or undefined when it may. A unit test beside its code may
+ * also import its feature's infra, as a test in tests/ may.
+ */
+function memberProblem(from: Place, to: Place, isTest: boolean): string | undefined {
   if (to.module === from.module) {
-    return undefined;
+    return isTest && isFeatureInfra(to) ? undefined : ownModuleProblem(from, to);
   }
-  // A feature's infra/ holds that feature's adapters, so it also imports the root infra they build on.
   const allowedLayers: readonly Layer[] = isFeatureInfra(from)
-    ? [...allowed.features, "infra"]
+    ? featureInfraLayers
     : allowed[from.layer];
   if (!allowedLayers.includes(to.layer)) {
-    return `${from.layer} may not import ${to.layer}.`;
+    return isFeatureInfra(from)
+      ? `A feature's infra may not import ${to.layer}.`
+      : `${from.layer} may not import ${to.layer}.`;
   }
-  // The composition root, an entrypoint's compose.ts, reaches a feature's infra/, its second surface, through
-  // infra/exports.ts.
-  if (from.layer === "entrypoints" && from.inside === "compose" && isFeatureInfra(to)) {
+  if (
+    isFeatureInfra(from) &&
+    to.layer === "entities" &&
+    !portEntities(from.root, from.module).includes(to.module)
+  ) {
+    return "A feature's infra imports only the entities its feature's port names.";
+  }
+  if (isFeatureInfra(to)) {
+    if (from.layer !== "entrypoints" || from.inside !== "compose") {
+      return "Only the composition root, an entrypoint's compose.ts, imports a feature's infra.";
+    }
     return to.inside === "infra/exports"
       ? undefined
       : "Import a feature's infra through its infra/exports.ts.";
   }
   return published.has(to.layer) ? surfaceProblem(from, to) : undefined;
+}
+
+/**
+ * Returns why a file may not import another file of its own module, or undefined when it may. A feature's infra
+ * imports of its feature only the port, and the feature's other code does not import its infra: the composition root
+ * passes the adapter in.
+ */
+function ownModuleProblem(from: Place, to: Place): string | undefined {
+  if (isFeatureInfra(from)) {
+    return isFeatureInfra(to) || isPort(to)
+      ? undefined
+      : "A feature's infra imports of its feature only the port.";
+  }
+  return isFeatureInfra(to)
+    ? "A feature does not import its own infra: the composition root passes the adapter in."
+    : undefined;
 }
 
 /** Returns why an import of module `to` breaks its surface, or undefined when it takes the surface it should. */
@@ -126,11 +161,13 @@ const rule: CreateRule = {
       if (root === undefined || source?.type !== "Literal" || typeof source.value !== "string") {
         return;
       }
-      const to = placeOfImport(root, context.filename, source.value);
+      const to = placeOfImport(context.filename, source.value);
       if (!to) {
         return;
       }
-      const problem = from ? memberProblem(from, to) : testProblem(to);
+      const problem = from
+        ? memberProblem(from, to, testFile.test(context.filename))
+        : testProblem(to);
       if (problem) {
         context.report({ node, message: problem });
       }
@@ -140,6 +177,18 @@ const rule: CreateRule = {
         const problem = from ? moduleProblem(context.filename, from) : undefined;
         if (problem) {
           context.report({ node, message: problem });
+        }
+        const isCode = !testFile.test(context.filename) && !declarationFile.test(context.filename);
+        const surface =
+          from && isCode
+            ? surfaceProblems({ filename: context.filename, from, text: context.sourceCode.text })
+            : [];
+        for (const { start, end, message } of surface) {
+          const loc = {
+            start: context.sourceCode.getLocFromIndex(start),
+            end: context.sourceCode.getLocFromIndex(end),
+          };
+          context.report({ loc, message });
         }
       },
       ImportDeclaration: check,
