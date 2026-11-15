@@ -1,8 +1,7 @@
-// The rule `kk-forge/layers`: a file under src/ imports only the layers its own layer may take, and another module
-// only through that module's surface file. A file in the tests/ folder beside src/ may import any layer, through the
-// surface file too. An entities module needs two or more importers among features, orchestration and entities modules,
-// and an orchestration module imports two or more features. A feature's surface gives out its components, its use
-// cases and types, which src/feature-surface.ts checks.
+// The oxlint rule `kk-forge/layers`: a file under src/ imports only the layers its layer may take,
+// and another module only through its surface file. A test in tests/ beside src/ may import any
+// layer, through the surface file too. The rule also checks module importer counts, a feature's
+// surface through src/feature-surface.ts, and monorepo imports through src/repository.ts.
 import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
 
@@ -22,6 +21,7 @@ import {
   placeOfImport,
   testFile,
 } from "./places.js";
+import { packageProblem, repositoryImport, unitOfRoot } from "./repository.js";
 
 /** The layers whose modules another module reaches only through a surface file. */
 const published = new Set<Layer>(["orchestration", "features", "entities", "shared"]);
@@ -56,6 +56,22 @@ function isSurface(to: Place): boolean {
 
 /** The layers a feature's infra imports beyond its own feature. */
 const featureInfraLayers: readonly Layer[] = ["entities", "infra", "shared"];
+
+/**
+ * Returns why a file under src/ may not import the surface of a package for `layer`, or undefined when it may. An app
+ * imports each surface as it would its own layer, so only entrypoints, infra and a feature's infra/ import a
+ * package's infra.
+ */
+function packageSurfaceProblem(from: Place, layer: Layer, specifier: string): string | undefined {
+  const allowedLayers: readonly Layer[] = isFeatureInfra(from)
+    ? featureInfraLayers
+    : allowed[from.layer];
+  if (allowedLayers.includes(layer)) {
+    return undefined;
+  }
+  const importer = isFeatureInfra(from) ? "A feature's infra" : from.layer;
+  return `${importer} may not import ${specifier}, a package's ${layer}.`;
+}
 
 /** Returns why a test's import of module `to` breaks its surface, or undefined when it takes a surface. */
 function testProblem(to: Place): string | undefined {
@@ -92,7 +108,7 @@ function memberProblem(from: Place, to: Place, isTest: boolean): string | undefi
   if (
     isFeatureInfra(from) &&
     to.layer === "entities" &&
-    !portEntities(from.root, from.module).includes(to.module)
+    !portEntities(from.module).includes(to.module)
   ) {
     return "A feature's infra imports only the entities its feature's port names.";
   }
@@ -156,9 +172,21 @@ const rule: CreateRule = {
     // A file under src/ is a member of its module, a unit test beside its code included. A test in tests/ belongs to
     // the src/ beside that folder.
     const root = from ? from.root : testedSource(context.filename);
+    const unit = root === undefined ? undefined : unitOfRoot(root);
     const check = (node: ImportNode) => {
       const source = node.source;
       if (root === undefined || source?.type !== "Literal" || typeof source.value !== "string") {
+        return;
+      }
+      const named = unit ? repositoryImport(unit, context.filename, source.value) : undefined;
+      if (named) {
+        const problem =
+          "problem" in named
+            ? named.problem
+            : from && packageSurfaceProblem(from, named.layer, named.specifier);
+        if (problem) {
+          context.report({ node, message: problem });
+        }
         return;
       }
       const to = placeOfImport(context.filename, source.value);
@@ -174,9 +202,13 @@ const rule: CreateRule = {
     };
     return {
       Program(node) {
-        const problem = from ? moduleProblem(context.filename, from) : undefined;
-        if (problem) {
-          context.report({ node, message: problem });
+        for (const problem of [
+          from ? moduleProblem(context.filename, from) : undefined,
+          packageProblem(context.filename),
+        ]) {
+          if (problem) {
+            context.report({ node, message: problem });
+          }
         }
         const isCode = !testFile.test(context.filename) && !declarationFile.test(context.filename);
         const surface =

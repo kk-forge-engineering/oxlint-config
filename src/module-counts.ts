@@ -1,11 +1,10 @@
 // The parts of `kk-forge/layers` that count imports across modules. An entities module is what two or more modules of
 // features, orchestration or entities import. An orchestration module imports two or more features. oxlint lints one
 // file at a time, so the checks read these imports from disk.
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 
-import { parseSync } from "oxc-parser";
-
+import { importSpecifiers, sourceFile, sourceFiles } from "./imports.js";
 import {
   declarationFile,
   fileAt,
@@ -14,15 +13,11 @@ import {
   placeOfImport,
   testFile,
 } from "./places.js";
+import { newRecent } from "./recent.js";
 
 // The checks count no import from an entrypoint, which takes an entity's type from a feature's surface. A feature's
 // infra/ sits in its feature, so its imports count as the feature's. The root infra and shared import no entity.
 const consumerLayers: readonly Layer[] = ["features", "orchestration", "entities"];
-
-const sourceFile = /\.[cm]?[jt]sx?$/;
-// The checks count a dynamic import only when a string literal, or a template literal without a placeholder, names its
-// module.
-const literal = /^(["'`])([^"'`$]*)\1$/;
 
 /** A module a file imports: its layer and its folder, or its file when the module is one file. */
 interface Target {
@@ -30,63 +25,24 @@ interface Target {
   module: string;
 }
 
-interface Imports {
-  mtimeMs: number;
-  size: number;
-  targets: Target[];
-}
-
 /**
- * Holds the imports of each file read so far. A long-lived oxlint, such as the language server, reads a file again only
- * once its time or size changes.
+ * Holds the modules each file imports, with the specifiers they were placed from. `importSpecifiers` returns the same
+ * array until the file changes, so the checks place a file's imports again only after it changes.
  */
-const imports = new Map<string, Imports>();
+const imports = new Map<string, { specifiers: string[]; targets: Target[] }>();
 
-/** Returns every source file under a folder that is no test, or none when the folder is missing. */
-function sourceFiles(dir: string): string[] {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  return entries.flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return entry.name === "node_modules" || entry.name.startsWith(".") ? [] : sourceFiles(path);
-    }
-    // The checks skip a test file. A test follows its code, so it makes no consumer and adds no feature to an
-    // orchestration module.
-    return entry.isFile() && sourceFile.test(entry.name) && !testFile.test(entry.name)
-      ? [path]
-      : [];
-  });
-}
-
-/** Returns the modules in the layers that a file imports. `root` is the src/ folder of the app. */
-function importedModules(root: string, file: string): Target[] {
-  const { mtimeMs, size } = statSync(file);
+/** Returns the modules in the layers that a file imports. */
+function importedModules(file: string): Target[] {
+  const specifiers = importSpecifiers(file);
   const known = imports.get(file);
-  if (known?.mtimeMs === mtimeMs && known.size === size) {
+  if (known?.specifiers === specifiers) {
     return known.targets;
   }
-  const code = readFileSync(file, "utf8");
-  const { module } = parseSync(file, code);
-  const specifiers = [
-    ...module.staticImports.map((entry) => entry.moduleRequest.value),
-    ...module.staticExports.flatMap((entry) =>
-      entry.entries.flatMap((name) => (name.moduleRequest ? [name.moduleRequest.value] : [])),
-    ),
-    ...module.dynamicImports.flatMap((entry) => {
-      const match = literal.exec(code.slice(entry.moduleRequest.start, entry.moduleRequest.end));
-      return match?.[2] === undefined ? [] : [match[2]];
-    }),
-  ];
   const targets = specifiers.flatMap((specifier) => {
     const to = placeOfImport(file, specifier);
     return to ? [{ layer: to.layer, module: to.module }] : [];
   });
-  imports.set(file, { mtimeMs, size, targets });
+  imports.set(file, { specifiers, targets });
   return targets;
 }
 
@@ -95,36 +51,26 @@ function nameOf(root: string, module: string): string {
   return relative(root, module).replaceAll("\\", "/").replace(sourceFile, "");
 }
 
-/** The modules each module of `consumerLayers` imports, by module path, and when the checks read the map. */
-interface ModuleMap {
-  readAt: number;
-  imports: Map<string, Target[]>;
-}
-
 /**
- * Holds the module map of each src/ folder. One oxlint run lints every anchor of an app within moments, so the checks
- * share one walk of the layers. A long-lived oxlint walks again once the map is a second old.
+ * Holds the modules each module of `consumerLayers` imports, by module path, for each src/ folder. One oxlint run lints
+ * every anchor of an app within moments, so the checks share one walk of the layers.
  */
-const moduleMaps = new Map<string, ModuleMap>();
-const mapLifetimeMilliseconds = 1000;
+const moduleMaps = newRecent<Map<string, Target[]>>();
 
 /** Returns which modules each module of `consumerLayers` imports. `root` is the src/ folder of the app. */
 function moduleImports(root: string): Map<string, Target[]> {
-  const known = moduleMaps.get(root);
-  if (known && performance.now() - known.readAt < mapLifetimeMilliseconds) {
-    return known.imports;
-  }
-  const map = new Map<string, Target[]>();
-  for (const layer of consumerLayers) {
-    for (const file of sourceFiles(join(root, layer))) {
-      // A module is the folder or file directly under its layer.
-      const [name = ""] = relative(join(root, layer), file).split(/[/\\]/);
-      const module = join(root, layer, name);
-      map.set(module, [...(map.get(module) ?? []), ...importedModules(root, file)]);
+  return moduleMaps(root, () => {
+    const map = new Map<string, Target[]>();
+    for (const layer of consumerLayers) {
+      for (const file of sourceFiles(join(root, layer))) {
+        // A module is the folder or file directly under its layer.
+        const [name = ""] = relative(join(root, layer), file).split(/[/\\]/);
+        const module = join(root, layer, name);
+        map.set(module, [...(map.get(module) ?? []), ...importedModules(file)]);
+      }
     }
-  }
-  moduleMaps.set(root, { readAt: performance.now(), imports: map });
-  return map;
+    return map;
+  });
 }
 
 /**
@@ -222,10 +168,10 @@ export function moduleProblem(filename: string, from: Place): string | undefined
  * Returns the entities modules a feature's port imports, the port being `port.ts` or the files under `port/` in the
  * feature module `feature`. The feature's infra imports only these entities.
  */
-export function portEntities(root: string, feature: string): string[] {
+export function portEntities(feature: string): string[] {
   const file = fileAt(join(feature, "port"));
   const files = file === undefined ? sourceFiles(join(feature, "port")) : [file];
   return files.flatMap((portFile) =>
-    importedModules(root, portFile).flatMap((to) => (to.layer === "entities" ? [to.module] : [])),
+    importedModules(portFile).flatMap((to) => (to.layer === "entities" ? [to.module] : [])),
   );
 }
