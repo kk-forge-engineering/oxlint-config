@@ -93,10 +93,10 @@ await test("a config that extends the presets reports each broken rule of the fi
   assert.doesNotMatch(run.stdout, /infra\/logger\.ts/, run.stdout);
   // A feature's infra/ is infra, and a test is not the program, so neither is reported for the console.
   assert.doesNotMatch(run.stdout, /features\/a\/infra\/sink\.ts:.*no-console/, run.stdout);
-  assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*no-console/, run.stdout);
+  assert.doesNotMatch(run.stdout, /TestFile\.test\.ts:.*no-console/, run.stdout);
   // A test may set innerHTML, but a native dialog is banned there too.
-  assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*'innerHTML'/, run.stdout);
-  assert.match(run.stdout, /Console\.test\.ts:\d+:\d+: 'self\.confirm' is restricted/, run.stdout);
+  assert.doesNotMatch(run.stdout, /TestFile\.test\.ts:.*'innerHTML'/, run.stdout);
+  assert.match(run.stdout, /TestFile\.test\.ts:\d+:\d+: 'self\.confirm' is restricted/, run.stdout);
   // no-alert reads window and globalThis, and no-restricted-properties catches the dialogs on self.
   assert.match(run.stdout, /Broken\.tsx:\d+:\d+: 'self\.prompt' is restricted/, run.stdout);
   assert.match(
