@@ -69,7 +69,9 @@
   "overrides": [
     {
       // A test is not the program, so it may print, as core.md exempts it from the environment rules. A string of HTML
-      // it sets up runs in no page a user sees, so it may set innerHTML. A native dialog stays banned there as anywhere.
+      // it sets up runs in no page a user sees, so it may set HTML from a string. A native dialog stays banned in a test.
+      // oxlint replaces the base options with this list rather than merging them, so the list repeats the base list
+      // without its HTML entries, and test/configs.test.ts checks that the two match.
       "files": ["**/*.test.*", "**/*.spec.*", "**/tests/**"],
       "rules": {
         "no-console": "off",
