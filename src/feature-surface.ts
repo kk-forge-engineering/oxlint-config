@@ -148,7 +148,7 @@ const destructuresOptions = (params: ParamPattern[], options: string): boolean =
  */
 function constructorParams(declaration: Class): ParamPattern[] | undefined {
   for (const member of declaration.body.body) {
-    // An overloaded constructor lists its signatures first. The one with a body is the constructor that runs.
+    // An overloaded constructor lists its signatures first.
     if (
       member.type === "MethodDefinition" &&
       member.kind === "constructor" &&

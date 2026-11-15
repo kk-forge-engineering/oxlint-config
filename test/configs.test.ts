@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { test } from "node:test";
@@ -93,10 +93,10 @@ await test("a config that extends the presets reports each broken rule of the fi
   assert.doesNotMatch(run.stdout, /infra\/logger\.ts/, run.stdout);
   // A feature's infra/ is infra, and a test is not the program, so neither is reported for the console.
   assert.doesNotMatch(run.stdout, /features\/a\/infra\/sink\.ts:.*no-console/, run.stdout);
-  assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*no-console/, run.stdout);
+  assert.doesNotMatch(run.stdout, /TestFile\.test\.ts:.*no-console/, run.stdout);
   // A test may set innerHTML, but a native dialog is banned there too.
-  assert.doesNotMatch(run.stdout, /Console\.test\.ts:.*'innerHTML'/, run.stdout);
-  assert.match(run.stdout, /Console\.test\.ts:\d+:\d+: 'self\.confirm' is restricted/, run.stdout);
+  assert.doesNotMatch(run.stdout, /TestFile\.test\.ts:.*'innerHTML'/, run.stdout);
+  assert.match(run.stdout, /TestFile\.test\.ts:\d+:\d+: 'self\.confirm' is restricted/, run.stdout);
   // no-alert reads window and globalThis, and no-restricted-properties catches the dialogs on self.
   assert.match(run.stdout, /Broken\.tsx:\d+:\d+: 'self\.prompt' is restricted/, run.stdout);
   assert.match(
@@ -117,6 +117,46 @@ function reports(stdout: string): string[] {
   assert.equal(Number(/^(\d+) problems?$/m.exec(stdout)?.[1] ?? 0), tagged.length, stdout);
   return tagged.toSorted((left, right) => left.localeCompare(right));
 }
+
+type Restrictions = [string, ...{ object?: string; property: string }[]];
+type Preset = {
+  rules: Record<string, Restrictions>;
+  overrides: { files: string[]; rules: Record<string, Restrictions> }[];
+};
+
+/** Tells whether a parsed preset has the rules and overrides the test reads, the shape oxlint's config schema gives. */
+function isPreset(value: unknown): value is Preset {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "rules" in value &&
+    typeof value.rules === "object" &&
+    "overrides" in value &&
+    Array.isArray(value.overrides)
+  );
+}
+
+// oxlint replaces a rule's base options with an override's, so the test-file list of no-restricted-properties is a
+// copy. This test fails when a restriction added to the base list is missing from the copy, which would leave tests
+// free of it. typescript.json keeps its comments on lines of their own, so dropping those lines leaves plain JSON.
+await test("the test-file override keeps every restriction of the base list but the HTML ones", () => {
+  const preset: unknown = JSON.parse(
+    readFileSync(new URL("../typescript.json", import.meta.url), "utf8").replace(
+      /^\s*\/\/.*$/gm,
+      "",
+    ),
+  );
+  assert.ok(isPreset(preset), "typescript.json holds rules and overrides");
+  const rule = "eslint/no-restricted-properties";
+  const testFiles = preset.overrides.find((override) => override.files.includes("**/*.test.*"));
+  const htmlProperties = new Set(["innerHTML", "outerHTML", "insertAdjacentHTML"]);
+  const [level, ...restrictions] = preset.rules[rule] ?? [];
+
+  assert.deepEqual(testFiles?.rules[rule], [
+    level,
+    ...restrictions.filter((restriction) => !htmlProperties.has(restriction.property)),
+  ]);
+});
 
 // The tests pack the package as npm publishes it, so they lint through the
 // built plugin a consumer installs.
