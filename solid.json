@@ -6,7 +6,8 @@
     "solid/jsx-no-undef": "error",
     "solid/jsx-uses-vars": "error",
     "solid/no-unknown-namespaces": "error",
-    "solid/no-innerhtml": "error",
+    // A static string of HTML is still markup the page runs, so innerHTML takes none.
+    "solid/no-innerhtml": ["error", { "allowStatic": false }],
     "solid/jsx-no-script-url": "error",
     "solid/components-return-once": "error",
     "solid/no-destructure": "error",

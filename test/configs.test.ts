@@ -60,6 +60,8 @@ await test("a config that extends the presets reports each broken rule of the fi
     "eslint(eqeqeq)",
     "eslint(curly)",
     "eslint(max-lines)",
+    "eslint(no-alert)",
+    "eslint(no-restricted-properties)",
     "solid(no-module-scope-reactive-primitive)",
     "solid(validate-jsx-nesting)",
     "solid(no-unused-signal)",
@@ -83,6 +85,8 @@ await test("a config that extends the presets reports each broken rule of the fi
   ]) {
     assert.equal(run.stdout.match(rule)?.length, 1, run.stdout);
   }
+  // solid.json allows no innerHTML, a static string of HTML included, so both of Broken.tsx's are reported.
+  assert.equal(run.stdout.match(/solid\(no-innerhtml\)/g)?.length, 2, run.stdout);
   // typescript.json lets only infra call the console, so a Logger.ts elsewhere is reported.
   assert.doesNotMatch(run.stdout, /infra\/logger\.ts/, run.stdout);
   // A feature's infra/ is infra, and a test is not the program, so neither is reported for the console.

@@ -9,6 +9,23 @@
     "denyWarnings": true
   },
   "rules": {
+    // A native dialog blocks the page and cannot be styled or tested: a library's window replaces it.
+    "eslint/no-alert": "error",
+    "eslint/no-restricted-properties": [
+      "error",
+      {
+        "property": "innerHTML",
+        "message": "A string of HTML would run in the page: insert the text as nodes."
+      },
+      {
+        "property": "outerHTML",
+        "message": "A string of HTML would run in the page: insert the text as nodes."
+      },
+      {
+        "property": "insertAdjacentHTML",
+        "message": "A string of HTML would run in the page: insert the text as nodes."
+      }
+    ],
     "typescript/no-explicit-any": "error",
     "typescript/ban-ts-comment": "error",
     "typescript/no-non-null-assertion": "error",
