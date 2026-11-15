@@ -1,8 +1,6 @@
-// The part of `kk-forge/layers` that reads what a feature's surface gives out: its components, its `<X>UseCases` and
-// types. A component declares its return type `JSX.Element`. `<X>UseCases` is a class in `<x>UseCases.ts`, where `<x>`
-// is the feature's folder name, built by its factory `new<X>UseCases(options: <X>UseCasesOptions)`. The check follows
-// each name the surface exports to its declaration, through the files it is re-exported from, so a name passes only on
-// what its declaration shows.
+// The part of `kk-forge/layers` that checks a feature's surface: it gives out only its components, its use cases class
+// and factory, its error classes and types. A component declares its return type `JSX.Element`. The use cases take
+// their names from the feature's folder. The check follows each exported name to its declaration.
 import { basename, dirname, join } from "node:path";
 
 import type { Class, Declaration, ParamPattern } from "oxc-parser";
@@ -72,7 +70,10 @@ const what: Record<Kind, string> = {
   value: "a value",
 };
 
-/** Returns why each name a feature's surface file exports breaks the surface, or none for a file that is no surface. */
+/**
+ * Returns one problem for each name a surface file of a feature exports that
+ * breaks the surface.
+ */
 function exportProblems({
   filename,
   names,
@@ -134,8 +135,9 @@ function takesOptions(params: ParamPattern[], options: string): boolean {
 }
 
 /**
- * Returns whether a constructor takes the options as one destructured object, as in
- * `{ retries, ...deps }: TextsUseCasesOptions`, so each setting and the deps leave it by name.
+ * Returns whether a constructor takes the options as one destructured object,
+ * as in
+ * `{ retries, ...deps }: TextsUseCasesOptions`.
  */
 const destructuresOptions = (params: ParamPattern[], options: string): boolean =>
   takesOptions(params, options) && params[0]?.type === "ObjectPattern";

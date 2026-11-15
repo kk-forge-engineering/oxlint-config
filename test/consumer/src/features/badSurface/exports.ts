@@ -1,5 +1,6 @@
-// A feature's surface gives out its components, its use cases, its error classes and types, so seven of these exports
-// break it.
+// This fixture breaks the feature surface rule on purpose. The rule lets a
+// feature's surface export only its components, use cases, error classes and
+// types. The lint check must report seven of the exports below.
 export { createSignal } from "solid-js";
 export { trim } from "./trim";
 export const limit = 3;

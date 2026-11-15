@@ -1,4 +1,3 @@
-// The constructor keeps the options whole instead of destructuring them.
 export type BadIdentifierUseCasesOptions = { retries: number };
 
 export class BadIdentifierUseCases {

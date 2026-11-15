@@ -6,9 +6,10 @@ import { basename, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-// oxlint runs with no flags in a folder whose config only extends typescript.json, solid.json and vitest.json, as a
-// consumer's does. So the run also shows that typeAware and denyWarnings reach it through extends, and that solid.json
-// finds the plugin from the package's folder.
+// The test runs oxlint with no flags in fixtures/, whose config only extends
+// typescript.json, solid.json and vitest.json, as a consumer's config does.
+// So the run also shows that typeAware and denyWarnings reach it through
+// extends, and that solid.json finds the plugin from the package's folder.
 await test("a config that extends the presets reports each broken rule of the fixture", () => {
   const run = spawnSync("npx", ["oxlint", "--format", "unix"], {
     cwd: new URL("fixtures", import.meta.url),
@@ -85,7 +86,8 @@ await test("a config that extends the presets reports each broken rule of the fi
   ]) {
     assert.equal(run.stdout.match(rule)?.length, 1, run.stdout);
   }
-  // solid.json allows no innerHTML, a static string of HTML included, so both of Broken.tsx's are reported.
+  // solid.json forbids innerHTML even with a static HTML string, so the
+  // test expects both innerHTML uses in Broken.tsx to be reported.
   assert.equal(run.stdout.match(/solid\(no-innerhtml\)/g)?.length, 2, run.stdout);
   // typescript.json lets only infra call the console, so a Logger.ts elsewhere is reported.
   assert.doesNotMatch(run.stdout, /infra\/logger\.ts/, run.stdout);
@@ -179,11 +181,10 @@ await test("the packed package", async (packedPackage) => {
     },
   );
 
-  // test/consumer is a WXT app with Solid that installs the package and extends every preset but vitest.json. Each of
-  // those loads the plugin, and the list shows each problem once. Each file named bad-* or in a folder named bad-*
-  // breaks a rule, and so does each file named index.ts outside an entrypoint. A feature's surface reports in its
-  // exports.ts and its use cases file, so the features badSurface, badEmpty and badIdentifier break the rule there.
-  // Every other file follows the rules.
+  // test/consumer is a WXT app with Solid that extends every preset but
+  // vitest.json. Each file named bad-* or in a bad-* folder breaks a rule, as
+  // does each index.ts outside an entrypoint. The features badSurface,
+  // badEmpty and badIdentifier report in exports.ts and the use cases file.
   await packedPackage.test(
     "a WXT app with Solid gets a report for each broken rule and nothing else",
     (context) => {
