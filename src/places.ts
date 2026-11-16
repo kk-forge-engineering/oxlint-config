@@ -41,7 +41,7 @@ export interface Place {
   file: boolean;
 }
 
-const isLayer = (value: string | undefined): value is Layer =>
+export const isLayer = (value: string | undefined): value is Layer =>
   value !== undefined && Object.hasOwn(allowed, value);
 
 /** Returns where a path sits under src/, or undefined outside the layers. */

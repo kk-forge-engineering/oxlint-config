@@ -1,11 +1,14 @@
-// The rule `kk-forge/environment`: outside infra, a file under src/ reads neither the clock and its timers, nor random
-// numbers or ids, nor the environment, nor the interface strings of chrome.i18n. The program controls none of them, so
-// only infra reads them, and logic takes the value as a parameter. The rule matches the global a reference resolves to,
-// so a local name that only looks alike passes. A test is exempt, since it is not the program. The console is
-// no-console's in typescript.json.
+// The rule `kk-forge/environment`: outside infra, a file under src/ reads neither the clock, random
+// numbers, the environment nor chrome.i18n, since the program controls none of them. A package's
+// infra reads no environment, since each app's composition root passes the package its config. The
+// console is left to `no-console` in `typescript.json`.
 import type { Context, CreateRule, ESTree, Scope } from "@oxlint/plugins";
 
 import { isFeatureInfra, place, testFile } from "./places.js";
+import { UnitKind, unitOfRoot } from "./repository.js";
+
+/** What `process.env` and `import.meta.env` read, the one read a package's infra is held to as well. */
+const environment = "the environment";
 
 /** The globals whose members the rule watches, by the members it reports and what each reads. */
 const watchedMembers: Record<string, Record<string, string>> = {
@@ -13,7 +16,7 @@ const watchedMembers: Record<string, Record<string, string>> = {
   performance: { now: "the clock" },
   Math: { random: "a random number" },
   crypto: { randomUUID: "a random id", getRandomValues: "random numbers" },
-  process: { env: "the environment" },
+  process: { env: environment },
   chrome: { i18n: "the interface strings" },
 };
 
@@ -24,8 +27,8 @@ const watchedCalls: Record<string, string> = {
 };
 
 /**
- * Node's modules whose named exports the rule watches, by module without the `node:` prefix it also accepts. An
- * argument of process stays the entrypoint's, so only process.env counts.
+ * Node's modules whose named exports the rule watches, by module without the `node:` prefix it also
+ * accepts. The entrypoint owns the arguments of `process`, so only `process.env` counts.
  */
 const watchedModules: Record<string, Record<string, string>> = {
   crypto: {
@@ -36,7 +39,7 @@ const watchedModules: Record<string, Record<string, string>> = {
     randomFill: "random numbers",
     randomFillSync: "random numbers",
   },
-  process: { env: "the environment" },
+  process: { env: environment },
   timers: {
     setTimeout: "the clock's timers",
     setInterval: "the clock's timers",
@@ -65,6 +68,8 @@ const nodeModule = (source: string): string =>
 const hint =
   "which only infra reads: take the value as a parameter, or a Clock, Random, config or strings facade " +
   "from the composition root";
+const packageInfraHint =
+  "which a package's infra does not read: take the value as a parameter from each app's composition root";
 
 /** Returns the value a record holds for a key it owns, so a key such as `constructor` finds nothing. */
 const own = <Value>(record: Record<string, Value>, key: string): Value | undefined =>
@@ -77,11 +82,20 @@ const rule: CreateRule = {
   },
   create(context: Context) {
     const at = place(context.filename);
-    if (!at || at.layer === "infra" || isFeatureInfra(at) || testFile.test(context.filename)) {
+    if (!at || testFile.test(context.filename)) {
+      return {};
+    }
+    const isInfra = at.layer === "infra" || isFeatureInfra(at);
+    const isPackageInfra = isInfra && unitOfRoot(at.root)?.kind === UnitKind.Package;
+    if (isInfra && !isPackageInfra) {
       return {};
     }
     const report = (node: ESTree.Node, name: string, reads: string) => {
-      context.report({ node, message: `${name} reads ${reads}, ${hint}.` });
+      if (!isPackageInfra) {
+        context.report({ node, message: `${name} reads ${reads}, ${hint}.` });
+      } else if (reads === environment) {
+        context.report({ node, message: `${name} reads ${reads}, ${packageInfraHint}.` });
+      }
     };
     /** Returns the reference an identifier makes, or undefined when it makes none, as a property name does. */
     const referenceOf = (node: ESTree.Node) => {
@@ -175,7 +189,7 @@ const rule: CreateRule = {
             report(
               node,
               `node:${nodeModule(node.source.value)}`,
-              Object.values(members)[0] ?? "the environment",
+              Object.values(members)[0] ?? environment,
             );
           }
         }
@@ -196,7 +210,7 @@ const rule: CreateRule = {
         }
         if (node.object.type === "MetaProperty") {
           if (node.object.meta.name === "import" && member === "env") {
-            report(node, "import.meta.env", "the environment");
+            report(node, "import.meta.env", environment);
           }
           return;
         }

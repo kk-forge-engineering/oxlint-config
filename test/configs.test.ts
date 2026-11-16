@@ -176,55 +176,61 @@ await test("the packed package", async (packedPackage) => {
   assert.equal(pack.status, 0, pack.stderr);
   const tarball = join(packed, pack.stdout.trim().split("\n").at(-1) ?? "");
 
-  // Each file under test/layers/src or test/layers/tests named bad-* breaks one rule of layers.json: kk-forge/environment
-  // where it is named bad-env-*, and kk-forge/layers otherwise. Every other file keeps them. The test installs the
-  // tarball outside the repo, so the plugin finds only the dependencies the package declares. --legacy-peer-deps skips
-  // the peers, so the repo's own are used.
-  await packedPackage.test(
-    "layers.json reports each problem of the layers fixture and nothing else",
-    () => {
-      const installed = join(packed, "layers");
-      mkdirSync(installed);
-      writeFileSync(join(installed, "package.json"), JSON.stringify({ private: true }));
-      const install = spawnSync(
-        "npm",
-        [
-          "install",
-          "--prefer-offline",
-          "--ignore-scripts",
-          "--legacy-peer-deps",
-          "--no-audit",
-          "--no-fund",
-          tarball,
-        ],
-        { cwd: installed, encoding: "utf8" },
-      );
-      assert.equal(install.status, 0, install.stdout + install.stderr);
-      const config = join(installed, "consumer.json");
-      writeFileSync(
-        config,
-        JSON.stringify({ extends: ["./node_modules/@kk-forge/oxlint-config/layers.json"] }),
-      );
-      const run = spawnSync("npx", ["oxlint", "-c", config, "--format", "unix"], {
-        cwd: new URL("layers", import.meta.url),
-        encoding: "utf8",
-      });
-      const broken = ["src", "tests"]
-        .flatMap((folder) =>
-          readdirSync(new URL(`layers/${folder}`, import.meta.url), {
-            recursive: true,
-            encoding: "utf8",
-          }).map((file) => `${folder}/${file}`),
-        )
-        .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
-        .map(
-          (file) =>
-            `${file} kk-forge(${basename(file).startsWith("bad-env-") ? "environment" : "layers"})`,
-        )
-        .toSorted((left, right) => left.localeCompare(right));
-      assert.deepEqual(reports(run.stdout), broken, run.stdout + run.stderr);
-    },
+  // The test installs the tarball outside the repo, so the plugin resolves only the dependencies
+  // the package declares. --legacy-peer-deps skips the peers, so the plugin uses the repo's own.
+  const installed = join(packed, "layers");
+  mkdirSync(installed);
+  writeFileSync(join(installed, "package.json"), JSON.stringify({ private: true }));
+  const install = spawnSync(
+    "npm",
+    [
+      "install",
+      "--prefer-offline",
+      "--ignore-scripts",
+      "--legacy-peer-deps",
+      "--no-audit",
+      "--no-fund",
+      tarball,
+    ],
+    { cwd: installed, encoding: "utf8" },
   );
+  assert.equal(install.status, 0, install.stdout + install.stderr);
+  writeFileSync(
+    join(installed, "consumer.json"),
+    JSON.stringify({ extends: ["./node_modules/@kk-forge/oxlint-config/layers.json"] }),
+  );
+  // A fixture's bad-* files each break one rule, bad-env-* the environment one. test/standalone lays out apps/ and
+  // packages/ under a root that declares no workspaces, so it holds no bad-* file and gets no report.
+  for (const { fixture, folders } of [
+    { fixture: "layers", folders: ["src", "tests"] },
+    { fixture: "monorepo", folders: ["apps", "packages"] },
+    { fixture: "standalone", folders: ["apps", "packages"] },
+  ]) {
+    await packedPackage.test(
+      `layers.json reports each problem of the ${fixture} fixture and nothing else`,
+      () => {
+        const run = spawnSync(
+          "npx",
+          ["oxlint", "-c", join(installed, "consumer.json"), "--format", "unix"],
+          { cwd: new URL(fixture, import.meta.url), encoding: "utf8" },
+        );
+        const broken = folders
+          .flatMap((folder) =>
+            readdirSync(new URL(`${fixture}/${folder}`, import.meta.url), {
+              recursive: true,
+              encoding: "utf8",
+            }).map((file) => `${folder}/${file}`),
+          )
+          .filter((file) => basename(file).startsWith("bad-") && /\.tsx?$/.test(file))
+          .map(
+            (file) =>
+              `${file} kk-forge(${basename(file).startsWith("bad-env-") ? "environment" : "layers"})`,
+          )
+          .toSorted((left, right) => left.localeCompare(right));
+        assert.deepEqual(reports(run.stdout), broken, run.stdout + run.stderr);
+      },
+    );
+  }
 
   // test/consumer is a WXT app with Solid that extends every preset but
   // vitest.json. Each file named bad-* or in a bad-* folder breaks a rule, as
