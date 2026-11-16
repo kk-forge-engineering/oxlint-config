@@ -21,7 +21,8 @@ import {
   placeOfImport,
   testFile,
 } from "./places.js";
-import { packageProblem, repositoryImport, unitOfRoot } from "./repository.js";
+import { innerModuleProblem } from "./package-modules.js";
+import { packageProblem, repositoryImport, UnitKind, unitOfRoot } from "./repository.js";
 
 /** The layers whose modules another module reaches only through a surface file. */
 const published = new Set<Layer>(["orchestration", "features", "entities", "shared"]);
@@ -194,7 +195,10 @@ const rule: CreateRule = {
         return;
       }
       const problem = from
-        ? memberProblem(from, to, testFile.test(context.filename))
+        ? (memberProblem(from, to, testFile.test(context.filename)) ??
+          (unit?.kind === UnitKind.Package
+            ? innerModuleProblem({ filename: context.filename, specifier: source.value, to })
+            : undefined))
         : testProblem(to);
       if (problem) {
         context.report({ node, message: problem });

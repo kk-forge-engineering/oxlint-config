@@ -8,6 +8,7 @@ import { importSpecifiers, sourceFile, sourceFiles } from "./imports.js";
 import {
   declarationFile,
   fileAt,
+  pathFrom,
   type Layer,
   type Place,
   placeOfImport,
@@ -48,7 +49,7 @@ function importedModules(file: string): Target[] {
 
 /** Returns a module's name as the reports print it, such as `features/a`. */
 function nameOf(root: string, module: string): string {
-  return relative(root, module).replaceAll("\\", "/").replace(sourceFile, "");
+  return pathFrom(root, module).replace(sourceFile, "");
 }
 
 /**
