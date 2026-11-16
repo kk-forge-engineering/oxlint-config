@@ -232,6 +232,31 @@ await test("the packed package", async (packedPackage) => {
     );
   }
 
+  await packedPackage.test(
+    "layers.json tells a package of one app from a package nothing imports",
+    () => {
+      const run = spawnSync(
+        "npx",
+        ["oxlint", "-c", join(installed, "consumer.json"), "--format", "unix"],
+        { cwd: new URL("monorepo", import.meta.url), encoding: "utf8" },
+      );
+      const advice = (file: string) =>
+        new RegExp(`^${file}:\\d+:\\d+: (.*) \\[Error/kk-forge\\(layers\\)\\]$`, "m").exec(
+          run.stdout,
+        )?.[1];
+      assert.equal(
+        advice("packages/lonely/src/shared/bad-one-app.ts"),
+        "Only apps/web imports @mono/lonely, and no other package does: move it into apps/web, since a package holds the code that two or more apps use.",
+        run.stdout,
+      );
+      assert.equal(
+        advice("packages/unused/src/shared/bad-no-app.ts"),
+        "No app or other package imports @mono/unused: delete it, since a package holds the code that two or more apps use.",
+        run.stdout,
+      );
+    },
+  );
+
   // test/consumer is a WXT app with Solid that extends every preset but
   // vitest.json. Each file named bad-* or in a bad-* folder breaks a rule, as
   // does each index.ts outside an entrypoint. The features badSurface,

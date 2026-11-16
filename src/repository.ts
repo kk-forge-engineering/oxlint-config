@@ -250,6 +250,6 @@ export function packageProblem(filename: string): string | undefined {
     return undefined;
   }
   return only === undefined
-    ? `No app or other package imports ${name}: move it into the app that uses it, ${packageHint}.`
+    ? `No app or other package imports ${name}: delete it, ${packageHint}.`
     : `Only ${only} imports ${name}, and no other package does: move it into ${only}, ${packageHint}.`;
 }
