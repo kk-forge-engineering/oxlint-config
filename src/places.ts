@@ -1,6 +1,6 @@
 // Where a path sits in the layers of an app's src/ folder, and which module an import names.
 import { existsSync, statSync } from "node:fs";
-import { dirname, resolve, sep } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 
 import { aliasTarget } from "./tsconfig.js";
 
@@ -17,6 +17,10 @@ export const allowed = {
   infra: ["infra", "shared"],
 } as const satisfies Record<string, readonly string[]>;
 export type Layer = keyof typeof allowed;
+
+/** Returns the path from `from` to `to` with "/" separators, as the reports print a name. */
+export const pathFrom = (from: string, to: string): string =>
+  relative(from, to).replaceAll("\\", "/");
 
 /** Matches the name of a test file, `*.test.*` or `*.spec.*` with a JavaScript or TypeScript extension. */
 export const testFile = /\.(test|spec)\.[cm]?[jt]sx?$/;

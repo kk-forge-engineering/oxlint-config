@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 
 import { importSpecifiers, sourceFiles } from "./imports.js";
-import { declarationFile, importTarget, isLayer, type Layer } from "./places.js";
+import { declarationFile, importTarget, isLayer, type Layer, pathFrom } from "./places.js";
 import { newRecent } from "./recent.js";
 
 export enum UnitKind {
@@ -82,6 +82,19 @@ function readManifest(dir: string): unknown {
   }
 }
 
+/**
+ * Returns whether the package.json of a package marks it a technical engine, with `"layers": { "kind": "engine" }`.
+ * architecture/core.md keeps such a package apart from its app even when one app alone uses it.
+ */
+function isEngine(dir: string): boolean {
+  const manifest = readManifest(dir);
+  const marks =
+    typeof manifest === "object" && manifest !== null && "layers" in manifest
+      ? manifest.layers
+      : undefined;
+  return typeof marks === "object" && marks !== null && "kind" in marks && marks.kind === "engine";
+}
+
 /** Returns the name the package.json of an app or package declares, or undefined when it declares none. */
 function declaredName(dir: string): string | undefined {
   const manifest = readManifest(dir);
@@ -148,7 +161,7 @@ function repositoryMap(repo: string): RepositoryMap {
 }
 
 /** Returns the name of an app or package as the reports print it, such as `apps/web`. */
-const folderOf = (unit: Unit): string => relative(unit.repo, unit.dir).replaceAll("\\", "/");
+const folderOf = (unit: Unit): string => pathFrom(unit.repo, unit.dir);
 
 const appSourceProblem =
   "An import into another app's source is forbidden: move the code both apps use into a package.";
@@ -233,6 +246,9 @@ export function packageProblem(filename: string): string | undefined {
     return undefined;
   }
   const [only] = apps;
+  if (only !== undefined && isEngine(unit.dir)) {
+    return undefined;
+  }
   return only === undefined
     ? `No app or other package imports ${name}: move it into the app that uses it, ${packageHint}.`
     : `Only ${only} imports ${name}, and no other package does: move it into ${only}, ${packageHint}.`;

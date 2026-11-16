@@ -1,0 +1,7 @@
+{
+  "name": "@mono/solo-engine",
+  "private": true,
+  "layers": {
+    "kind": "engine"
+  }
+}
