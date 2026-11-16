@@ -199,6 +199,7 @@ await test("the packed package", async (packedPackage) => {
     join(installed, "consumer.json"),
     JSON.stringify({ extends: ["./node_modules/@kk-forge/oxlint-config/layers.json"] }),
   );
+  const stdouts = new Map<string, string>();
   // A fixture's bad-* files each break one rule, bad-env-* the environment one. test/standalone lays out apps/ and
   // packages/ under a root that declares no workspaces, so it holds no bad-* file and gets no report.
   for (const { fixture, folders } of [
@@ -214,6 +215,7 @@ await test("the packed package", async (packedPackage) => {
           ["oxlint", "-c", join(installed, "consumer.json"), "--format", "unix"],
           { cwd: new URL(fixture, import.meta.url), encoding: "utf8" },
         );
+        stdouts.set(fixture, run.stdout);
         const broken = folders
           .flatMap((folder) =>
             readdirSync(new URL(`${fixture}/${folder}`, import.meta.url), {
@@ -235,24 +237,24 @@ await test("the packed package", async (packedPackage) => {
   await packedPackage.test(
     "layers.json tells a package of one app from a package nothing imports",
     () => {
-      const run = spawnSync(
-        "npx",
-        ["oxlint", "-c", join(installed, "consumer.json"), "--format", "unix"],
-        { cwd: new URL("monorepo", import.meta.url), encoding: "utf8" },
+      const stdout = stdouts.get("monorepo");
+      assert.ok(
+        stdout !== undefined,
+        "the subtest of the monorepo fixture runs first and keeps its report",
       );
       const advice = (file: string) =>
         new RegExp(`^${file}:\\d+:\\d+: (.*) \\[Error/kk-forge\\(layers\\)\\]$`, "m").exec(
-          run.stdout,
+          stdout,
         )?.[1];
       assert.equal(
         advice("packages/lonely/src/shared/bad-one-app.ts"),
         "Only apps/web imports @mono/lonely, and no other package does: move it into apps/web, since a package holds the code that two or more apps use.",
-        run.stdout,
+        stdout,
       );
       assert.equal(
         advice("packages/unused/src/shared/bad-no-app.ts"),
         "No app or other package imports @mono/unused: delete it, since a package holds the code that two or more apps use.",
-        run.stdout,
+        stdout,
       );
     },
   );
