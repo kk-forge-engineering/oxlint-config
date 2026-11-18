@@ -1,6 +1,8 @@
 // The rule `kk-forge/launcher`. A launcher is a file a framework requires by name. The rule lets it hold its imports and
-// one line: the framework's own definition around one call, or a bare call. The logic then stays in code the project
-// names. wxt.json turns the rule on for WXT's entrypoint files.
+// one line: the framework's own definition around one call, or a bare call. With the option `defaultExport`, the line
+// may also be a default export of one call or of a name the file imports, for a framework that takes the file's default
+// export as it is. The logic then stays in code the project names. wxt.json turns the rule on for WXT's entrypoint
+// files, and solid-start.json, with `defaultExport`, for SolidStart's.
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
 type Statement = ESTree.Program["body"][number];
@@ -116,10 +118,56 @@ function isEntryLine(statement: Statement): boolean {
   return argument?.type === "ObjectExpression" && isDefinitionOptions(argument);
 }
 
+/** Returns whether a statement is a default export of one call or of a name in `imported`, the file's value imports. */
+function isDefaultExportLine(statement: Statement, imported: ReadonlySet<string>): boolean {
+  if (statement.type !== "ExportDefaultDeclaration") {
+    return false;
+  }
+  const exported = statement.declaration;
+  if (exported.type === "Identifier") {
+    return imported.has(exported.name);
+  }
+  return exported.type === "CallExpression" && isOneCall(exported);
+}
+
+/** Returns the local names a program's imports bind to values. A type-only import binds no value. */
+function importedValues(program: ESTree.Program): Set<string> {
+  return new Set(
+    program.body.flatMap((statement) =>
+      statement.type === "ImportDeclaration" && statement.importKind !== "type"
+        ? statement.specifiers
+            .filter(
+              (specifier) =>
+                specifier.type !== "ImportSpecifier" || specifier.importKind !== "type",
+            )
+            .map((specifier) => specifier.local.name)
+        : [],
+    ),
+  );
+}
+
+/** Returns whether the rule's options turn on `defaultExport`. */
+function allowsDefaultExport(options: Context["options"]): boolean {
+  const [first] = options;
+  return (
+    typeof first === "object" &&
+    first !== null &&
+    !Array.isArray(first) &&
+    first.defaultExport === true
+  );
+}
+
 const rule: CreateRule = {
   meta: {
     type: "problem",
     docs: { description: "Keeps a launcher to its imports and one line" },
+    schema: [
+      {
+        type: "object",
+        properties: { defaultExport: { type: "boolean" } },
+        additionalProperties: false,
+      },
+    ],
   },
   create(context: Context) {
     return {
@@ -127,7 +175,11 @@ const rule: CreateRule = {
         const [line, extra] = program.body.filter(
           (statement) => statement.type !== "ImportDeclaration",
         );
-        const offending = !line ? program : !isEntryLine(line) ? line : extra;
+        const isLine = (statement: Statement) =>
+          isEntryLine(statement) ||
+          (allowsDefaultExport(context.options) &&
+            isDefaultExportLine(statement, importedValues(program)));
+        const offending = !line ? program : !isLine(line) ? line : extra;
         if (offending) {
           context.report({
             node: offending,

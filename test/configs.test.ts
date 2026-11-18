@@ -287,6 +287,7 @@ await test("the packed package", async (packedPackage) => {
         reports(run.stdout),
         [
           "src/entrypoints/bad-call-option/index.ts kk-forge(launcher)",
+          "src/entrypoints/bad-default-call/index.ts kk-forge(launcher)",
           "src/entrypoints/bad-default-parameter/index.ts kk-forge(launcher)",
           "src/entrypoints/bad-flat.ts kk-forge(wxt-entrypoint-folder)",
           "src/entrypoints/bad-generator/index.ts eslint(require-yield)",
@@ -334,6 +335,49 @@ await test("the packed package", async (packedPackage) => {
           "src/features/svg/bad-svg.tsx kk-forge(no-inline-svg)",
           "src/index.ts kk-forge(no-index-files)",
           "tests/bad-deep.ts kk-forge(layers)",
+        ],
+        run.stdout + run.stderr,
+      );
+    },
+  );
+
+  // test/solid-start is a SolidStart app that extends typescript.json, solid.json and solid-start.json. Each file
+  // named bad-* or in a bad-* folder breaks kk-forge/launcher. The test beside a route holds logic and gets no report.
+  await packedPackage.test(
+    "a SolidStart app gets a report for each launcher that holds more than one line",
+    (context) => {
+      const installed = new URL(
+        "solid-start/node_modules/@kk-forge/oxlint-config",
+        import.meta.url,
+      );
+      context.after(() =>
+        rmSync(new URL("solid-start/node_modules", import.meta.url), {
+          recursive: true,
+          force: true,
+        }),
+      );
+      mkdirSync(installed, { recursive: true });
+      const untar = spawnSync(
+        "tar",
+        ["-xzf", tarball, "-C", fileURLToPath(installed), "--strip-components=1"],
+        { encoding: "utf8" },
+      );
+      assert.equal(untar.status, 0, untar.stderr);
+      const run = spawnSync("npx", ["oxlint", "--format", "unix"], {
+        cwd: new URL("solid-start", import.meta.url),
+        encoding: "utf8",
+      });
+      assert.deepEqual(
+        reports(run.stdout),
+        [
+          "bad-app/src/app.tsx kk-forge(launcher)",
+          "bad-entry/src/entry-client.tsx kk-forge(launcher)",
+          "src/entrypoints/site/routes/bad-api.ts kk-forge(launcher)",
+          "src/entrypoints/site/routes/bad-call-object.tsx kk-forge(launcher)",
+          "src/entrypoints/site/routes/bad-global.tsx kk-forge(launcher)",
+          "src/entrypoints/site/routes/bad-page.tsx kk-forge(launcher)",
+          "src/entrypoints/site/routes/bad-reexport.tsx kk-forge(launcher)",
+          "src/entrypoints/site/routes/bad-type-import.tsx kk-forge(launcher)",
         ],
         run.stdout + run.stderr,
       );

@@ -1,0 +1,21 @@
+{
+  "jsPlugins": ["./dist/plugin.js"],
+  "overrides": [
+    // SolidStart finds app.tsx, entry-client.tsx and entry-server.tsx by name in src/, and makes a route of each file
+    // under a routes folder. Each such file holds its imports and one line that hands over to the project's code.
+    // SolidStart takes each file's default export as it is, so the line may be `export default startServer()` or
+    // `export default HomePage`.
+    {
+      "files": [
+        "**/src/app.tsx",
+        "**/src/entry-client.tsx",
+        "**/src/entry-server.tsx",
+        "**/routes/**/*.ts",
+        "**/routes/**/*.tsx"
+      ],
+      "rules": { "kk-forge/launcher": ["error", { "defaultExport": true }] }
+    },
+    // A test beside a route is no route: the file router skips it, and it holds the test's logic.
+    { "files": ["**/*.test.*", "**/*.spec.*"], "rules": { "kk-forge/launcher": "off" } }
+  ]
+}

@@ -4,14 +4,15 @@ Shared oxlint configs for KK Forge's TypeScript packages.
 
 Each preset owns one concern, so a package extends only the ones that describe it, and any combination works. Every preset that uses a `kk-forge` rule loads the plugin itself, and a config that extends several reports each problem once.
 
-| Package                               | Presets                                                                   |
-| ------------------------------------- | ------------------------------------------------------------------------- |
-| TypeScript library                    | `typescript.json`                                                         |
-| TypeScript library tested with vitest | `typescript.json`, `vitest.json`                                          |
-| Solid library                         | `typescript.json`, `solid.json`, `vitest.json`                            |
-| Node service or CLI                   | `typescript.json`, `layers.json`, `vitest.json`                           |
-| Solid web app                         | `typescript.json`, `solid.json`, `layers.json`, `vitest.json`             |
-| WXT extension with Solid              | `typescript.json`, `solid.json`, `layers.json`, `wxt.json`, `vitest.json` |
+| Package                               | Presets                                                                           |
+| ------------------------------------- | --------------------------------------------------------------------------------- |
+| TypeScript library                    | `typescript.json`                                                                 |
+| TypeScript library tested with vitest | `typescript.json`, `vitest.json`                                                  |
+| Solid library                         | `typescript.json`, `solid.json`, `vitest.json`                                    |
+| Node service or CLI                   | `typescript.json`, `layers.json`, `vitest.json`                                   |
+| Solid web app                         | `typescript.json`, `solid.json`, `layers.json`, `vitest.json`                     |
+| WXT extension with Solid              | `typescript.json`, `solid.json`, `layers.json`, `wxt.json`, `vitest.json`         |
+| SolidStart app                        | `typescript.json`, `solid.json`, `layers.json`, `solid-start.json`, `vitest.json` |
 
 - `typescript.json`, the language: the `correctness` category plus the rules it lacks that catch a bug or code that misleads its reader, type-aware, warnings fail. It turns on these besides:
   - The `no-unsafe-*` family and `no-unsafe-type-assertion`, so a value typed `any`, or cast to a type it was never checked against, cannot flow on unchecked. A value from outside, such as JSON or a message, gets a parser.
@@ -29,6 +30,7 @@ Each preset owns one concern, so a package extends only the ones that describe i
 - `vitest.json`, the tests: the `vitest` plugin's correctness rules on `*.test.*` and `*.spec.*` files, which is vitest's own default include. They catch an assertion that never runs, never awaits or sits in a branch, a focused or skipped test, and a `vi.fn()` without its type, which is an `any` in the test. A test holds the typed mock itself, as in `const send = vi.fn<Port["send"]>(); const port = { send }; expect(send)…`, or `const send = vi.spyOn(port, "send")`. Reading `port.send` instead trips `typescript/unbound-method`, which `typescript.json` keeps on in tests too.
 - `solid.json`, Solid and its JSX: eslint-plugin-solid's recommended rules, with `solid/no-innerhtml` refusing a static string too, `solid/no-unused-signal`, `solid/no-accessor-as-prop`, `solid/no-module-scope-reactive-primitive`, the `jsx-a11y` plugin's correctness rules, `kk-forge/no-conditional-map` and `kk-forge/no-inline-svg`. `jsx-a11y/control-has-associated-label` and `jsx-a11y/label-has-associated-control` look 4 levels deep, not the default 2, for a control's or a label's text (the label rule also for its nested control): Solid's `<Show>` and `<For>` each add a level, and text behind two of them read as missing. A signal or memo at module scope is global state that bypasses the composition root, so a component or the composition root creates it. `kk-forge/no-conditional-map` fails a `.map()` list in JSX children under a condition, such as `{open && rows.map(…)}`, `||`, `??` or `? :`. Solid reruns such an expression on any change and builds every row again, and `solid/prefer-for` catches only a `.map()` that is the whole expression. Render the list with `<For>` inside `<Show>`. `kk-forge/no-inline-svg` fails SVG markup in JSX, `<svg>`, `<path>` or any name in the `svg` namespace, since an icon lives in its own `.svg` file that a component imports. A drawing or a chart a project builds in JSX is that project's exception, with its reason. SVG inside a string is past the rule's reach.
 - `wxt.json`, a WXT extension's entrypoints, under **WXT** below.
+- `solid-start.json`, a SolidStart app's launchers, under **SolidStart** below.
 - `layers.json`, an app's architecture: the layers `entrypoints → orchestration → features → entities → shared`. A file imports only layers to its right, and entities also each other. It reaches another module only through that module's `exports.ts`, or `exports.<entrypoint>.ts`, where `<entrypoint>` names a folder or file in `src/entrypoints`, such as `exports.background.ts` or `exports.overlay.content.ts`. A module that has a surface for an entrypoint serves that entrypoint through it. A `shared` module is one file, which is its own surface, or a folder reached through its `exports.ts`. Each file or folder directly under `infra/` is a module of its own. Only `entrypoints`, `infra` and a feature's `infra/` import the root `infra`, which takes `shared` alone.
 
   A feature's `infra/` folder holds the adapters only that feature needs. It is the feature's second surface: only the composition root, an entrypoint's `compose.ts`, imports it, through `features/<x>/infra/exports.ts`, and a test may too, a unit test beside the feature's code included. It imports of its own feature only the port, `port.ts` or a file in `port/`. Beyond the feature it imports the entities that port imports, the root `infra` and `shared`. The feature's other code does not import its `infra/`, and no other module does either.
@@ -82,6 +84,21 @@ A WXT extension adds `"./node_modules/@kk-forge/oxlint-config/wxt.json"` to `ext
 - The framework's definition around an options object: `export default defineContentScript({ matches: ["*://*/*"], main: (ctx) => mountOverlay(ctx) })`. One property is a function, written as an arrow, a method or `function`, whose body is the call or a block that holds only the call. Every other property holds a string, a number, a negative number, a boolean, `null`, a template without expressions, or an array or object of these.
 
 In both definitions the function's parameters are plain names, with no defaults.
+
+## SolidStart
+
+A SolidStart app adds `"./node_modules/@kk-forge/oxlint-config/solid-start.json"` to `extends`. It turns on `kk-forge/launcher`, with its option `defaultExport`, for the files SolidStart requires: `src/app.tsx`, `src/entry-client.tsx` and `src/entry-server.tsx`, and each `.ts` and `.tsx` file under a folder named `routes`, where the file router finds the app's routes. The router skips a test there, and so does the rule.
+
+SolidStart takes each of these files' default export as it is. WXT's own files keep only the forms under **WXT**, and `defaultExport` adds two more:
+
+- A default export of the call itself, such as `export default startServer()`.
+- A default export of a name the file imports as a value, such as `export default HomePage`. A type-only import binds no value.
+
+A SolidStart app's files then look like this:
+
+- `src/entry-server.tsx` holds `export default startServer()`, which composes the app and returns the server's handler, and `src/entry-client.tsx` holds `startClient()`.
+- `src/app.tsx` and each page route hold `export default` of the component they import. SolidStart's route splitter drops `export { default } from`, so the rule rejects it.
+- The rule rejects an API route's `export function GET()`: the server handler that `startServer()` returns answers such a request before the page render.
 
 ## From 4 to 5
 
