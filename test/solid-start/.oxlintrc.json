@@ -1,0 +1,10 @@
+{
+  "extends": [
+    "./node_modules/@kk-forge/oxlint-config/typescript.json",
+    "./node_modules/@kk-forge/oxlint-config/solid.json",
+    "./node_modules/@kk-forge/oxlint-config/solid-start.json"
+  ],
+  // The app imports packages it does not install, so their values type as any and the type-aware rules would report
+  // them. The test of test/fixtures runs the type-aware rules.
+  "options": { "typeAware": false }
+}
