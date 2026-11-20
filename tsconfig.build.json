@@ -1,7 +1,10 @@
 {
   "extends": "./tsconfig.json",
+  // The declarations type the test's own plugin, which builds the rules over one more platform. package.json ships
+  // dist/*.js alone.
   "compilerOptions": {
     "noEmit": false,
+    "declaration": true,
     "outDir": "dist",
     "rootDir": "src"
   },

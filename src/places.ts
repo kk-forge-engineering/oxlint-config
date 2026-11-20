@@ -25,6 +25,16 @@ export const pathFrom = (from: string, to: string): string =>
 /** Matches the name of a test file, `*.test.*` or `*.spec.*` with a JavaScript or TypeScript extension. */
 export const testFile = /\.(test|spec)\.[cm]?[jt]sx?$/;
 
+/**
+ * Returns whether a path sits in a test kit: a folder named `testing` under src/, such as `src/testing/` or
+ * `src/shared/testing/`, which holds code only tests run.
+ */
+export function isTestKit(path: string): boolean {
+  const parts = path.split(sep);
+  const src = parts.lastIndexOf("src");
+  return src >= 0 && parts.slice(src + 1, -1).includes("testing");
+}
+
 /** Matches the name of a declaration file, `*.d.ts`, which only describes types. */
 export const declarationFile = /\.d\.[cm]?ts$/;
 
