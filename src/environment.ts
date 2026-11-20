@@ -1,11 +1,13 @@
 // The rule `kk-forge/environment`: outside infra, a file under src/ reads neither the clock, random
 // numbers, the environment, chrome.i18n, the network, browser storage, navigator nor location, since
 // the program controls none of them. A package's infra reads no environment, since each app's
-// composition root passes the package its config. The console is left to `no-console` in
+// composition root passes the package its config. A platform's global APIs, such as `chrome`, stay
+// in that platform's adapter, infra/<platform>. The console is left to `no-console` in
 // `typescript.json`.
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
-import { isFeatureInfra, place, testFile } from "./places.js";
+import { isFeatureInfra, isTestKit, place, testFile } from "./places.js";
+import { adapterOf, platformGlobals, portAdvice } from "./platforms.js";
 import { UnitKind, unitOfRoot } from "./repository.js";
 import { isGlobal as isGlobalIn, referenceOf } from "./scope.js";
 
@@ -133,6 +135,24 @@ function keyName(property: ESTree.Node): string | undefined {
   return literalName(property.key);
 }
 
+/**
+ * Returns whether an expression is read only for `chrome.i18n`: the object of `.i18n`, or the value `const { i18n }`
+ * destructures.
+ */
+function readsI18n(node: ESTree.Node): boolean {
+  const parent = node.parent;
+  if (parent?.type === "MemberExpression" && parent.object === node) {
+    return memberName(parent) === "i18n";
+  }
+  return (
+    parent?.type === "VariableDeclarator" &&
+    parent.init === node &&
+    parent.id.type === "ObjectPattern" &&
+    parent.id.properties.length > 0 &&
+    parent.id.properties.every((property) => keyName(property) === "i18n")
+  );
+}
+
 /** Returns whether an identifier is named by a type query, as `navigator` is in `typeof navigator.clipboard`. */
 function inTypeQuery(node: ESTree.Node): boolean {
   let parent = node.parent;
@@ -145,7 +165,10 @@ function inTypeQuery(node: ESTree.Node): boolean {
 const rule: CreateRule = {
   meta: {
     type: "problem",
-    docs: { description: "Keeps the clock, randomness and the environment in infra" },
+    docs: {
+      description:
+        "Keeps the clock, randomness and the environment in infra, and each platform's globals in its adapter",
+    },
   },
   create(context: Context) {
     const at = place(context.filename);
@@ -154,10 +177,24 @@ const rule: CreateRule = {
     }
     const isInfra = at.layer === "infra" || isFeatureInfra(at);
     const isPackageInfra = isInfra && unitOfRoot(at.root)?.kind === UnitKind.Package;
-    if (isInfra && !isPackageInfra) {
+    // An app's infra reads what the program does not control, so only the platform checks run there.
+    const checksReads = !isInfra || isPackageInfra;
+    // A test kit stands in for each platform with fakes, as a test does. The adapter of a platform uses its globals.
+    const ownPlatform = adapterOf(at);
+    const watchedPlatformGlobals = isTestKit(context.filename)
+      ? new Map<string, string>()
+      : new Map(
+          Object.entries(platformGlobals).flatMap(([platform, names]) =>
+            platform === ownPlatform ? [] : names.map((name) => [name, platform] as const),
+          ),
+        );
+    if (!checksReads && watchedPlatformGlobals.size === 0) {
       return {};
     }
     const report = (node: ESTree.Node, name: string, reads: string) => {
+      if (!checksReads) {
+        return;
+      }
       if (!isPackageInfra) {
         context.report({ node, message: `${name} reads ${reads}, ${hint}.` });
       } else if (reads === environment) {
@@ -171,6 +208,20 @@ const rule: CreateRule = {
     const importedModule = (node: ESTree.Node): string | undefined => {
       const definition = referenceOf(context, node)?.resolved?.defs[0];
       return definition === undefined ? undefined : moduleBindings.get(definition.node);
+    };
+    /**
+     * Reports a platform's global API used outside its adapter. Outside infra, `chrome.i18n` reports as the interface
+     * strings it reads, so that site gets one report.
+     */
+    const reportPlatform = (node: ESTree.Node, name: string, global: string) => {
+      const platform = watchedPlatformGlobals.get(global);
+      if (platform === undefined || (checksReads && !isPackageInfra && readsI18n(node))) {
+        return;
+      }
+      context.report({
+        node,
+        message: `${name} is the ${platform} platform's API, which only infra/${platform} uses: ${portAdvice(platform, at)}.`,
+      });
     };
     /** The globals any check of the rule names. A name outside this set skips the scope lookup. */
     const watched = new Set([
@@ -283,6 +334,9 @@ const rule: CreateRule = {
         if (read !== undefined) {
           report(node, `${globalObject}.${member}`, read);
         }
+        if (globalObject !== undefined) {
+          reportPlatform(node, `${globalObject}.${member}`, member);
+        }
         const object = globalName(node.object);
         const members = object === undefined ? undefined : own(watchedMembers, object);
         const reads = members === undefined ? undefined : own(members, member);
@@ -308,6 +362,9 @@ const rule: CreateRule = {
         if (reads !== undefined && !inTypeQuery(node) && isGlobal(node)) {
           report(node, node.name, reads);
         }
+        if (watchedPlatformGlobals.has(node.name) && isGlobal(node)) {
+          reportPlatform(node, node.name, node.name);
+        }
       },
       // `const { now } = Date` takes the member as `Date.now` does, and `const { fetch } = window` as `window.fetch`.
       VariableDeclarator(node) {
@@ -327,6 +384,9 @@ const rule: CreateRule = {
           const reads = members === undefined || key === undefined ? undefined : own(members, key);
           if (reads !== undefined) {
             report(property, `${globalObject ?? object}.${key}`, reads);
+          }
+          if (globalObject !== undefined && key !== undefined) {
+            reportPlatform(property, `${globalObject}.${key}`, key);
           }
         }
       },

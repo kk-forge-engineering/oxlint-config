@@ -178,6 +178,37 @@ function specifierOf(node: ESTree.Node | null | undefined): string | undefined {
   return undefined;
 }
 
+/** Returns the name an import or export specifier gives, from an identifier or a string. */
+const nameOf = (node: ESTree.Node): string | undefined =>
+  node.type === "Identifier" ? node.name : specifierOf(node);
+
+/**
+ * Returns the names an import or re-export takes from its module, or undefined when it takes the whole module, as a
+ * default, namespace, side-effect or dynamic import and `export *` do.
+ */
+function importedNames(node: ImportNode): string[] | undefined {
+  if (node.type === "ImportDeclaration") {
+    const names = node.specifiers.map((specifier) =>
+      specifier.type === "ImportSpecifier" ? nameOf(specifier.imported) : undefined,
+    );
+    return names.length > 0 && names.every((name) => name !== undefined) ? names : undefined;
+  }
+  if (node.type === "ExportNamedDeclaration") {
+    const names = node.specifiers.map((specifier) => nameOf(specifier.local));
+    return names.length > 0 && names.every((name) => name !== undefined) ? names : undefined;
+  }
+  return undefined;
+}
+
+/** Returns the name a type such as `import("x").Name` or `import("x").Name.Inner` takes from its module. */
+function importTypeName(node: ESTree.TSImportType): string[] | undefined {
+  let qualifier: ESTree.Node | null = node.qualifier;
+  while (qualifier?.type === "TSQualifiedName") {
+    qualifier = qualifier.left;
+  }
+  return qualifier?.type === "Identifier" ? [qualifier.name] : undefined;
+}
+
 const rule: CreateRule = {
   meta: {
     type: "problem",
@@ -201,13 +232,17 @@ const rule: CreateRule = {
       context.report({ node, message });
     };
     /** Checks a type import or a `require` only for platforms: the layer checks read the static imports. */
-    const checkPlatform = (node: ESTree.Node, specifier: string | undefined) => {
+    const checkPlatform = (
+      node: ESTree.Node,
+      specifier: string | undefined,
+      names?: readonly string[],
+    ) => {
       if (platformFrom === undefined || specifier === undefined) {
         return;
       }
       const to = placeOfImport(context.filename, specifier);
       platformImports.push({ node, specifier, to });
-      const problem = platformProblem({ from: platformFrom, specifier, to });
+      const problem = platformProblem({ from: platformFrom, specifier, to, names });
       if (problem) {
         report(node, problem);
       }
@@ -232,7 +267,9 @@ const rule: CreateRule = {
       if (platformFrom) {
         platformImports.push({ node, specifier, to });
       }
-      const platform = platformFrom && platformProblem({ from: platformFrom, specifier, to });
+      const platform =
+        platformFrom &&
+        platformProblem({ from: platformFrom, specifier, to, names: importedNames(node) });
       const problem = !to
         ? platform
         : from
@@ -275,7 +312,7 @@ const rule: CreateRule = {
       ImportExpression: check,
       // `import("wxt/browser").Browser` in a type.
       TSImportType(node) {
-        checkPlatform(node, specifierOf(node.source));
+        checkPlatform(node, specifierOf(node.source), importTypeName(node));
       },
       // `import api = require("@tauri-apps/api")`.
       TSImportEqualsDeclaration(node) {

@@ -1,7 +1,8 @@
 // The runtimes of one app. architecture/core.md gives an app on several runtimes one set of entrypoints per runtime and
-// one adapter per platform, `infra/chrome` and `infra/tauri`. So a platform's SDK stays in its adapter, only an
-// entrypoint imports an adapter, and an entrypoint imports one platform's code. oxlint lints one file at a time, so the
-// check reads the other files of an entrypoint from disk.
+// one adapter per platform, `infra/chrome` and `infra/tauri`. A platform's SDK and its global APIs live only in its
+// adapter, and only the entrypoints of that platform's runtime import the adapter. A feature's infra/ that needs the
+// platform declares a port, the adapter implements it, and the composition root passes it in. oxlint lints one file at
+// a time, so the check reads the other files of an entrypoint from disk.
 import { statSync } from "node:fs";
 import { sep } from "node:path";
 
@@ -21,13 +22,48 @@ const sdks: Record<Platform, { names: readonly string[]; prefixes: readonly stri
 };
 
 /**
- * Where each platform's SDK may be imported besides its adapter. WXT defines an entrypoint through its SDK, as in
- * `defineBackground` from `#imports`, while a Tauri window needs none.
+ * Each platform's global APIs, by the names a reference resolves to: the extension API's `chrome` and `browser`, and
+ * the objects Tauri puts on the window.
  */
-const sdkHomes: Record<Platform, string> = {
-  chrome: "infra/chrome and the entrypoints import",
-  tauri: "infra/tauri imports",
+export const platformGlobals: Record<Platform, readonly string[]> = {
+  chrome: ["chrome", "browser"],
+  tauri: ["__TAURI__", "__TAURI_INTERNALS__"],
 };
+
+/**
+ * What an entrypoint may take from the chrome SDK, by module: the entry API WXT defines or mounts an entrypoint
+ * through, and the types of what it mounts. `#imports` re-exports each. A Tauri window needs no such API, so an
+ * entrypoint takes nothing from the tauri SDK.
+ */
+const chromeEntryApi: Record<string, readonly string[]> = {
+  "wxt/utils/define-background": ["defineBackground"],
+  "wxt/utils/define-content-script": ["defineContentScript"],
+  "wxt/utils/define-unlisted-script": ["defineUnlistedScript"],
+  "wxt/utils/content-script-context": ["ContentScriptContext"],
+  "wxt/utils/content-script-ui/shadow-root": [
+    "createShadowRootUi",
+    "ShadowRootContentScriptUi",
+    "ShadowRootContentScriptUiOptions",
+  ],
+  "wxt/utils/content-script-ui/integrated": [
+    "createIntegratedUi",
+    "IntegratedContentScriptUi",
+    "IntegratedContentScriptUiOptions",
+  ],
+  "wxt/utils/content-script-ui/iframe": [
+    "createIframeUi",
+    "IframeContentScriptUi",
+    "IframeContentScriptUiOptions",
+  ],
+};
+
+/** Returns the names an entrypoint may import from a module of the chrome SDK, or undefined for none. */
+const entryApiOf = (specifier: string): readonly string[] | undefined =>
+  specifier === "#imports"
+    ? Object.values(chromeEntryApi).flat()
+    : Object.hasOwn(chromeEntryApi, specifier)
+      ? chromeEntryApi[specifier]
+      : undefined;
 
 const isPlatform = (value: string | undefined): value is Platform =>
   platforms.some((platform) => platform === value);
@@ -41,8 +77,8 @@ function sdkOf(specifier: string): Platform | undefined {
   );
 }
 
-/** Returns the platform whose adapter a module is, `infra/<platform>`, or undefined. */
-const adapterOf = (to: Place | undefined): Platform | undefined =>
+/** Returns the platform whose adapter a module is, `infra/<platform>` of an app or a package, or undefined. */
+export const adapterOf = (to: Place | undefined): Platform | undefined =>
   to?.layer === "infra" && isPlatform(to.name) ? to.name : undefined;
 
 /** Returns whether an import's target is another entrypoint than the module `self`. */
@@ -120,6 +156,15 @@ export interface PlatformImport {
 }
 
 /**
+ * The port advice each platform problem ends with. A module that needs the platform declares a port, the platform's
+ * adapter implements it, and the composition root passes it in.
+ */
+export const portAdvice = (platform: string, from: Place): string =>
+  from.layer === "entrypoints"
+    ? `wrap it in infra/${platform} and import that`
+    : `declare a port where the code needs it, implement it in infra/${platform}, and let the composition root pass it in`;
+
+/**
  * Returns why a file under src/ that is no test or test kit may not import `specifier`, which places at `to` when it
  * names a module of the layers, or undefined when it may. A platform's SDK stays in its adapter, and only an
  * entrypoint imports an adapter.
@@ -128,22 +173,32 @@ export function platformProblem({
   from,
   specifier,
   to,
-}: PlatformImport & { from: Place }): string | undefined {
+  names,
+}: PlatformImport & {
+  from: Place;
+  /** The names the import takes, or undefined when it takes the whole module or names none. */
+  names: readonly string[] | undefined;
+}): string | undefined {
   const sdk = sdkOf(specifier);
-  if (
-    sdk !== undefined &&
-    adapterOf(from) !== sdk &&
-    !(sdk === "chrome" && from.layer === "entrypoints")
-  ) {
-    const fix =
-      from.layer === "entrypoints"
-        ? `wrap it in infra/${sdk} and import that`
-        : `wrap it in infra/${sdk}, which the composition root passes in through a port`;
-    return `${specifier} is the ${sdk} platform's SDK, which only ${sdkHomes[sdk]}: ${fix}.`;
+  if (sdk !== undefined && adapterOf(from) !== sdk) {
+    const entryApi = from.layer === "entrypoints" ? entryApiOf(specifier) : undefined;
+    const outside =
+      entryApi === undefined || names === undefined || names.length === 0
+        ? undefined
+        : names.filter((name) => !entryApi.includes(name));
+    if (outside?.length === 0) {
+      return undefined;
+    }
+    const taken = outside === undefined ? specifier : `${outside.join(", ")} from ${specifier}`;
+    const entry =
+      from.layer === "entrypoints" && sdk === "chrome"
+        ? ` An entrypoint takes from it only the entry API that defines or mounts it, by name: ${[...new Set(Object.values(chromeEntryApi).flat())].join(", ")}.`
+        : "";
+    return `${taken} is the ${sdk} platform's SDK, which only infra/${sdk} imports: ${portAdvice(sdk, from)}.${entry}`;
   }
   const adapter = adapterOf(to);
   if (adapter !== undefined && from.layer !== "entrypoints" && to?.module !== from.module) {
-    return `Only an entrypoint imports infra/${adapter}, the ${adapter} platform's adapter, so the rest of the app runs on every runtime: the composition root passes it in through a port.`;
+    return `infra/${adapter} is the ${adapter} platform's adapter, which only the entrypoints of its runtime import: ${portAdvice(adapter, from)}.`;
   }
   return undefined;
 }
