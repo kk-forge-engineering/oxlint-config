@@ -1,5 +1,6 @@
 // The rule `kk-forge/environment`: outside infra, a file under src/ reads neither the clock, random
-// numbers, the environment nor chrome.i18n, since the program controls none of them. A package's
+// numbers, the environment, chrome.i18n, the network, browser storage, navigator nor location, since
+// the program controls none of them. A package's
 // infra reads no environment, since each app's composition root passes the package its config. The
 // console is left to `no-console` in `typescript.json`.
 import type { Context, CreateRule, ESTree, Scope } from "@oxlint/plugins";
@@ -20,10 +21,16 @@ const watchedMembers: Record<string, Record<string, string>> = {
   chrome: { i18n: "the interface strings" },
 };
 
-/** The global functions the rule watches wherever a reference names them, by what each reads. */
-const watchedCalls: Record<string, string> = {
+/** The globals the rule watches wherever a reference names them, by what each reads. */
+const watchedGlobals: Record<string, string> = {
   setTimeout: "the clock's timers",
   setInterval: "the clock's timers",
+  fetch: "the network",
+  navigator: "the browser's environment",
+  location: "the page's address",
+  localStorage: "browser storage",
+  sessionStorage: "browser storage",
+  indexedDB: "browser storage",
 };
 
 /**
@@ -66,14 +73,23 @@ const nodeModule = (source: string): string =>
   source.startsWith("node:") ? source.slice(5) : source;
 
 const hint =
-  "which only infra reads: take the value as a parameter, or a Clock, Random, config or strings facade " +
-  "from the composition root";
+  "which only infra reads: take the value as a parameter, or a Clock, Random, config, strings facade " +
+  "or port from the composition root";
 const packageInfraHint =
   "which a package's infra does not read: take the value as a parameter from each app's composition root";
 
 /** Returns the value a record holds for a key it owns, so a key such as `constructor` finds nothing. */
 const own = <Value>(record: Record<string, Value>, key: string): Value | undefined =>
   Object.hasOwn(record, key) ? record[key] : undefined;
+
+/** Returns whether an identifier is named by a type query, as `navigator` is in `typeof navigator.clipboard`. */
+function inTypeQuery(node: ESTree.Node): boolean {
+  let parent = node.parent;
+  while (parent?.type === "TSQualifiedName") {
+    parent = parent.parent;
+  }
+  return parent?.type === "TSTypeQuery";
+}
 
 const rule: CreateRule = {
   meta: {
@@ -127,7 +143,7 @@ const rule: CreateRule = {
     /** The globals any check of the rule names. A name outside this set skips the scope lookup. */
     const watched = new Set([
       ...Object.keys(watchedMembers),
-      ...Object.keys(watchedCalls),
+      ...Object.keys(watchedGlobals),
       "globalThis",
     ]);
     /** Returns the global an expression names: `Date`, or `crypto` in `globalThis.crypto`. */
@@ -219,9 +235,9 @@ const rule: CreateRule = {
           node.object.name === "globalThis" &&
           isGlobal(node.object)
         ) {
-          const timer = own(watchedCalls, member);
-          if (timer !== undefined) {
-            report(node, `globalThis.${member}`, timer);
+          const read = own(watchedGlobals, member);
+          if (read !== undefined) {
+            report(node, `globalThis.${member}`, read);
           }
         }
         const object = globalName(node.object);
@@ -242,11 +258,11 @@ const rule: CreateRule = {
           report(node, "Date()", "the clock");
         }
       },
-      // A timer reads the clock whether the code calls it or passes it on, as in `const later = setTimeout`.
-      // A type such as `typeof setTimeout` reads no clock, so the rule leaves a type position alone.
+      // A watched global reads whether the code calls it or passes it on, as in `const later = setTimeout`. A type such
+      // as `typeof setTimeout` or `typeof navigator.clipboard` reads nothing, so the rule leaves a type position alone.
       Identifier(node) {
-        const reads = own(watchedCalls, node.name);
-        if (reads !== undefined && node.parent.type !== "TSTypeQuery" && isGlobal(node)) {
+        const reads = own(watchedGlobals, node.name);
+        if (reads !== undefined && !inTypeQuery(node) && isGlobal(node)) {
           report(node, node.name, reads);
         }
       },
