@@ -246,8 +246,10 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
           return;
         }
         const to = placeOfImport(context.filename, specifier);
-        platformImports.push({ node, specifier, to });
-        const problem = checks.platformProblem({ from: platformFrom, specifier, to, names });
+        const named = unit ? repositoryImport(unit, context.filename, specifier) : undefined;
+        const entry = { node, specifier, to, packageAdapter: checks.packageAdapterOf(named) };
+        platformImports.push(entry);
+        const problem = checks.platformProblem({ ...entry, from: platformFrom, names });
         if (problem) {
           report(node, problem);
         }
@@ -259,10 +261,26 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
         }
         const named = unit ? repositoryImport(unit, context.filename, specifier) : undefined;
         if (named) {
+          if ("problem" in named) {
+            report(node, named.problem);
+            return;
+          }
+          const packageAdapter = checks.packageAdapterOf(named);
+          const entry = { node, specifier, to: undefined, packageAdapter };
+          if (packageAdapter && platformFrom) {
+            platformImports.push(entry);
+          }
+          const surface = packageAdapter
+            ? `${named.surface}/${packageAdapter.adapter}`
+            : named.surface;
           const problem =
-            "problem" in named
-              ? named.problem
-              : from && packageSurfaceProblem(from, named.layer, named.specifier);
+            (from && packageSurfaceProblem(from, named.layer, specifier)) ??
+            (named.rest !== "" && specifier !== surface
+              ? `Import ${specifier} through the package's ${named.layer} surface, ${surface}.`
+              : undefined) ??
+            (packageAdapter &&
+              platformFrom &&
+              checks.platformProblem({ ...entry, from: platformFrom, names: importedNames(node) }));
           if (problem) {
             report(node, problem);
           }

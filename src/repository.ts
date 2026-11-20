@@ -172,7 +172,7 @@ export type RepositoryImport =
   /** An import the layout forbids, and why. */
   | { problem: string }
   /** The surface of another package for a layer, such as `@repo/logger/infra` for its `infra`. */
-  | { layer: Layer; specifier: string }
+  | { layer: Layer; surface: string; rest: string }
   /** An import the layout leaves to the other checks. */
   | undefined;
 
@@ -190,7 +190,11 @@ export function repositoryImport(
   const byName = specifier.startsWith(".") ? undefined : named.get(name);
   const target = byName ? undefined : importTarget(filename, specifier);
   const to = byName ?? (target === undefined ? undefined : unitOfPath(from.repo, target));
-  if (!to || to.dir === from.dir) {
+  // A package can import its own files by relative path. Its name exposes the same layer surfaces to every caller.
+  if (
+    !to ||
+    (to.dir === from.dir && !(byName?.kind === UnitKind.Package && subpath.includes("/")))
+  ) {
     return undefined;
   }
   if (to.kind === UnitKind.App) {
@@ -203,8 +207,12 @@ export function repositoryImport(
     };
   }
   // The bare name is the package's shared. A path that names no layer, such as its testing entry, is no layer's surface.
-  const layer = subpath === "" ? "shared" : subpath;
-  return isLayer(layer) ? { layer, specifier } : undefined;
+  const [layer, ...inside] = subpath === "" ? ["shared"] : subpath.split("/");
+  if (!isLayer(layer)) {
+    return undefined;
+  }
+  const surface = layer === "shared" ? name : `${name}/${layer}`;
+  return { layer, surface, rest: inside.join("/") };
 }
 
 /**
