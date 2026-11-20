@@ -79,6 +79,12 @@ const packageInfraHint =
   "which a package's infra does not read: take the value as a parameter from each app's composition root";
 
 /** Returns the value a record holds for a key it owns, so a key such as `constructor` finds nothing. */
+/**
+ * The names of the global object. A browser gives it `window` and `self` too, so `window.location` reads what
+ * `location` does. `document.location` is a property of `document`, not of the global object, so it stays out.
+ */
+const globalObjects = new Set(["globalThis", "window", "self"]);
+
 const own = <Value>(record: Record<string, Value>, key: string): Value | undefined =>
   Object.hasOwn(record, key) ? record[key] : undefined;
 
@@ -144,9 +150,12 @@ const rule: CreateRule = {
     const watched = new Set([
       ...Object.keys(watchedMembers),
       ...Object.keys(watchedGlobals),
-      "globalThis",
+      ...globalObjects,
     ]);
-    /** Returns the global an expression names: `Date`, or `crypto` in `globalThis.crypto`. */
+    /** Returns whether an expression names the global object, as a global `globalThis`, `window` or `self`. */
+    const isGlobalObject = (node: ESTree.Node): node is ESTree.IdentifierReference =>
+      node.type === "Identifier" && globalObjects.has(node.name) && isGlobal(node);
+    /** Returns the global an expression names: `Date`, or `crypto` in `globalThis.crypto` or `window.crypto`. */
     const globalName = (node: ESTree.Expression): string | undefined => {
       if (node.type === "Identifier") {
         return watched.has(node.name) && isGlobal(node) ? node.name : undefined;
@@ -155,9 +164,7 @@ const rule: CreateRule = {
         node.type === "MemberExpression" &&
         !node.computed &&
         node.property.type === "Identifier" &&
-        node.object.type === "Identifier" &&
-        node.object.name === "globalThis" &&
-        isGlobal(node.object)
+        isGlobalObject(node.object)
       ) {
         return node.property.name;
       }
@@ -230,14 +237,10 @@ const rule: CreateRule = {
           }
           return;
         }
-        if (
-          node.object.type === "Identifier" &&
-          node.object.name === "globalThis" &&
-          isGlobal(node.object)
-        ) {
+        if (isGlobalObject(node.object)) {
           const read = own(watchedGlobals, member);
           if (read !== undefined) {
-            report(node, `globalThis.${member}`, read);
+            report(node, `${node.object.name}.${member}`, read);
           }
         }
         const object = globalName(node.object);
