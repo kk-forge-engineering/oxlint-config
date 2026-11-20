@@ -106,6 +106,28 @@ await test("a config that extends the presets reports each broken rule of the fi
   );
 });
 
+// test/platforms-plugin.ts builds the platform rules over the preset's platforms and one more, electron, which ships
+// in no preset. Its fixture holds a bad-* file for each check, bad-env-* for the environment rule's: the platform's SDK
+// and globals outside its adapter, its adapter outside the entrypoints, and an entrypoint that mixes it with chrome.
+// The plugin imports dist/, which `mise run test` builds first.
+await test("a platform added as one entry of the table gets every platform check", () => {
+  const run = spawnSync("npx", ["oxlint", "--format", "unix"], {
+    cwd: new URL("platforms", import.meta.url),
+    encoding: "utf8",
+  });
+  const broken = readdirSync(new URL("platforms/src", import.meta.url), {
+    recursive: true,
+    encoding: "utf8",
+  })
+    .filter((file) => basename(file).startsWith("bad-"))
+    .map(
+      (file) =>
+        `src/${file} kk-forge-platforms(${basename(file).startsWith("bad-env-") ? "environment" : "layers"})`,
+    )
+    .toSorted((left, right) => left.localeCompare(right));
+  assert.deepEqual(reports(run.stdout), broken, run.stdout + run.stderr);
+});
+
 /**
  * Returns each `<path> <rule>` an oxlint run reports, sorted. It first checks that the run's problem total counts only
  * those, so a problem with no rule, such as a fixture that fails to parse, fails the test.

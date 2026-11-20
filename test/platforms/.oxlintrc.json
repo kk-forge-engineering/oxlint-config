@@ -1,0 +1,4 @@
+{
+  "jsPlugins": ["../platforms-plugin.ts"],
+  "rules": { "kk-forge-platforms/layers": "error", "kk-forge-platforms/environment": "error" }
+}

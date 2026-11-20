@@ -1,13 +1,13 @@
 // The rule `kk-forge/environment`: outside infra, a file under src/ reads neither the clock, random
-// numbers, the environment, chrome.i18n, the network, browser storage, navigator nor location, since
-// the program controls none of them. A package's infra reads no environment, since each app's
-// composition root passes the package its config. A platform's global APIs, such as `chrome`, stay
-// in that platform's adapter, infra/<platform>. The console is left to `no-console` in
-// `typescript.json`.
+// numbers, the environment, a platform's interface strings, the network, browser storage, navigator
+// nor location, since the program controls none of them. A package's infra reads no environment,
+// since each app's composition root passes the package its config. A platform's global APIs stay in
+// that platform's adapter, infra/<adapter>, as src/platforms.ts lists them. The console is left to
+// `no-console` in `typescript.json`.
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
 import { isFeatureInfra, isTestKit, place, testFile } from "./places.js";
-import { adapterOf, platformGlobals, portAdvice } from "./platforms.js";
+import { newPlatformChecks, type Platform, platforms, portAdvice } from "./platforms.js";
 import { UnitKind, unitOfRoot } from "./repository.js";
 import { isGlobal as isGlobalIn, referenceOf } from "./scope.js";
 
@@ -21,8 +21,10 @@ const watchedMembers: Record<string, Record<string, string>> = {
   Math: { random: "a random number" },
   crypto: { randomUUID: "a random id", getRandomValues: "random numbers" },
   process: { env: environment },
-  chrome: { i18n: "the interface strings" },
 };
+
+/** What a platform's member such as its strings API reads, which the rule reports outside infra. */
+const interfaceStrings = "the interface strings";
 
 /** The globals the rule watches wherever a reference names them, by what each reads. */
 const watchedGlobals: Record<string, string> = {
@@ -136,20 +138,22 @@ function keyName(property: ESTree.Node): string | undefined {
 }
 
 /**
- * Returns whether an expression is read only for `chrome.i18n`: the object of `.i18n`, or the value `const { i18n }`
- * destructures.
+ * Returns whether an expression is read only for a platform's interface strings: the object of such a member, or the
+ * value a destructuring of only such members reads.
  */
-function readsI18n(node: ESTree.Node): boolean {
+function readsInterfaceStrings(node: ESTree.Node, platform: Platform): boolean {
   const parent = node.parent;
+  const isStrings = (name: string | undefined) =>
+    name !== undefined && platform.interfaceStrings.includes(name);
   if (parent?.type === "MemberExpression" && parent.object === node) {
-    return memberName(parent) === "i18n";
+    return isStrings(memberName(parent));
   }
   return (
     parent?.type === "VariableDeclarator" &&
     parent.init === node &&
     parent.id.type === "ObjectPattern" &&
     parent.id.properties.length > 0 &&
-    parent.id.properties.every((property) => keyName(property) === "i18n")
+    parent.id.properties.every((property) => isStrings(keyName(property)))
   );
 }
 
@@ -162,236 +166,258 @@ function inTypeQuery(node: ESTree.Node): boolean {
   return parent?.type === "TSTypeQuery";
 }
 
-const rule: CreateRule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Keeps the clock, randomness and the environment in infra, and each platform's globals in its adapter",
+/** Builds the rule over a list of platforms, the preset's own unless a test adds one. */
+export function newEnvironmentRule(list: readonly Platform[] = platforms): CreateRule {
+  const checks = newPlatformChecks(list);
+  /** The watched members, with each platform global's members that read the interface strings. */
+  const memberReads: Record<string, Record<string, string>> = { ...watchedMembers };
+  for (const platform of list) {
+    for (const global of platform.globals) {
+      for (const member of platform.interfaceStrings) {
+        memberReads[global] = { ...memberReads[global], [member]: interfaceStrings };
+      }
+    }
+  }
+  return {
+    meta: {
+      type: "problem",
+      docs: {
+        description:
+          "Keeps the clock, randomness and the environment in infra, and each platform's globals in its adapter",
+      },
     },
-  },
-  create(context: Context) {
-    const at = place(context.filename);
-    if (!at || testFile.test(context.filename)) {
-      return {};
-    }
-    const isInfra = at.layer === "infra" || isFeatureInfra(at);
-    const isPackageInfra = isInfra && unitOfRoot(at.root)?.kind === UnitKind.Package;
-    // An app's infra reads what the program does not control, so only the platform checks run there.
-    const checksReads = !isInfra || isPackageInfra;
-    // A test kit stands in for each platform with fakes, as a test does. The adapter of a platform uses its globals.
-    const ownPlatform = adapterOf(at);
-    const watchedPlatformGlobals = isTestKit(context.filename)
-      ? new Map<string, string>()
-      : new Map(
-          Object.entries(platformGlobals).flatMap(([platform, names]) =>
-            platform === ownPlatform ? [] : names.map((name) => [name, platform] as const),
-          ),
-        );
-    if (!checksReads && watchedPlatformGlobals.size === 0) {
-      return {};
-    }
-    const report = (node: ESTree.Node, name: string, reads: string) => {
-      if (!checksReads) {
-        return;
+    create(context: Context) {
+      const at = place(context.filename);
+      if (!at || testFile.test(context.filename)) {
+        return {};
       }
-      if (!isPackageInfra) {
-        context.report({ node, message: `${name} reads ${reads}, ${hint}.` });
-      } else if (reads === environment) {
-        context.report({ node, message: `${name} reads ${reads}, ${packageInfraHint}.` });
+      const isInfra = at.layer === "infra" || isFeatureInfra(at);
+      const isPackageInfra = isInfra && unitOfRoot(at.root)?.kind === UnitKind.Package;
+      // An app's infra reads what the program does not control, so only the platform checks run there.
+      const checksReads = !isInfra || isPackageInfra;
+      // A test kit stands in for each platform with fakes, as a test does. The adapter of a platform uses its globals.
+      const ownPlatform = checks.adapterOf(at);
+      const watchedPlatformGlobals = new Map(
+        isTestKit(context.filename)
+          ? []
+          : list.flatMap((platform) =>
+              platform === ownPlatform
+                ? []
+                : platform.globals.map((name) => [name, platform] as const),
+            ),
+      );
+      if (!checksReads && watchedPlatformGlobals.size === 0) {
+        return {};
       }
-    };
-    const isGlobal = (node: ESTree.Node): boolean => isGlobalIn(context, node);
-    /** The default and namespace imports of a watched module, by their specifier, as in `import * as crypto`. */
-    const moduleBindings = new Map<ESTree.Node, string>();
-    /** Returns the watched module a name refers to through a default or namespace import, or undefined. */
-    const importedModule = (node: ESTree.Node): string | undefined => {
-      const definition = referenceOf(context, node)?.resolved?.defs[0];
-      return definition === undefined ? undefined : moduleBindings.get(definition.node);
-    };
-    /**
-     * Reports a platform's global API used outside its adapter. Outside infra, `chrome.i18n` reports as the interface
-     * strings it reads, so that site gets one report.
-     */
-    const reportPlatform = (node: ESTree.Node, name: string, global: string) => {
-      const platform = watchedPlatformGlobals.get(global);
-      if (platform === undefined || (checksReads && !isPackageInfra && readsI18n(node))) {
-        return;
-      }
-      context.report({
-        node,
-        message: `${name} is the ${platform} platform's API, which only infra/${platform} uses: ${portAdvice(platform, at)}.`,
-      });
-    };
-    /** The globals any check of the rule names. A name outside this set skips the scope lookup. */
-    const watched = new Set([
-      ...Object.keys(watchedMembers),
-      ...Object.keys(watchedGlobals),
-      ...globalObjects,
-    ]);
-    /**
-     * Returns the name an expression gives the global object, or undefined when it names none: a global `globalThis`,
-     * `window` or `self`, one read off another, as in `globalThis.window`, and either under a cast, as in
-     * `(window as any)`.
-     */
-    const globalObjectName = (node: ESTree.Expression): string | undefined => {
-      const inner = uncast(node);
-      if (inner.type === "Identifier") {
-        return globalObjects.has(inner.name) && isGlobal(inner) ? inner.name : undefined;
-      }
-      if (inner.type !== "MemberExpression") {
-        return undefined;
-      }
-      const member = memberName(inner);
-      const object = globalObjectName(inner.object);
-      return member !== undefined && globalObjects.has(member) && object !== undefined
-        ? `${object}.${member}`
-        : undefined;
-    };
-    /** Returns the global an expression names: `Date`, or `crypto` in `globalThis.crypto` or `window["crypto"]`. */
-    const globalName = (node: ESTree.Expression): string | undefined => {
-      const inner = uncast(node);
-      if (inner.type === "Identifier") {
-        return watched.has(inner.name) && isGlobal(inner) ? inner.name : undefined;
-      }
-      if (inner.type !== "MemberExpression") {
-        return undefined;
-      }
-      const member = memberName(inner);
-      return member !== undefined && globalObjectName(inner.object) !== undefined
-        ? member
-        : undefined;
-    };
-    /** Reports the import of a module whose import itself reads, and returns its watched exports otherwise. */
-    const watchImport = (node: ESTree.Node, source: string): Record<string, string> | undefined => {
-      const module = nodeModule(source);
-      const whole = own(wholeModules, module);
-      if (whole !== undefined) {
-        report(node, `node:${module}`, whole);
-        return undefined;
-      }
-      return own(watchedModules, module);
-    };
-    return {
-      ImportDeclaration(node) {
-        if (node.importKind === "type") {
+      const report = (node: ESTree.Node, name: string, reads: string) => {
+        if (!checksReads) {
           return;
         }
-        const members = watchImport(node, node.source.value);
-        if (members === undefined) {
+        if (!isPackageInfra) {
+          context.report({ node, message: `${name} reads ${reads}, ${hint}.` });
+        } else if (reads === environment) {
+          context.report({ node, message: `${name} reads ${reads}, ${packageInfraHint}.` });
+        }
+      };
+      const isGlobal = (node: ESTree.Node): boolean => isGlobalIn(context, node);
+      /** The default and namespace imports of a watched module, by their specifier, as in `import * as crypto`. */
+      const moduleBindings = new Map<ESTree.Node, string>();
+      /** Returns the watched module a name refers to through a default or namespace import, or undefined. */
+      const importedModule = (node: ESTree.Node): string | undefined => {
+        const definition = referenceOf(context, node)?.resolved?.defs[0];
+        return definition === undefined ? undefined : moduleBindings.get(definition.node);
+      };
+      /**
+       * Reports a platform's global API used outside its adapter. Outside infra, a member that reads the interface
+       * strings reports as such, so that site gets one report.
+       */
+      const reportPlatform = (node: ESTree.Node, name: string, global: string) => {
+        const platform = watchedPlatformGlobals.get(global);
+        if (
+          platform === undefined ||
+          (checksReads && !isPackageInfra && readsInterfaceStrings(node, platform))
+        ) {
           return;
         }
-        const module = nodeModule(node.source.value);
-        for (const specifier of node.specifiers) {
-          if (specifier.type !== "ImportSpecifier") {
-            moduleBindings.set(specifier, module);
-            continue;
-          }
-          const name =
-            specifier.imported.type === "Identifier"
-              ? specifier.imported.name
-              : specifier.imported.value;
-          const reads = specifier.importKind === "type" ? undefined : own(members, name);
-          if (reads !== undefined) {
-            report(specifier, `node:${module}'s ${name}`, reads);
-          }
+        context.report({
+          node,
+          message: `${name} is the ${platform.adapter} platform's API, which only infra/${platform.adapter} uses: ${portAdvice(platform, at)}.`,
+        });
+      };
+      /** The globals any check of the rule names. A name outside this set skips the scope lookup. */
+      const watched = new Set([
+        ...Object.keys(memberReads),
+        ...Object.keys(watchedGlobals),
+        ...globalObjects,
+      ]);
+      /**
+       * Returns the name an expression gives the global object, or undefined when it names none: a global `globalThis`,
+       * `window` or `self`, one read off another, as in `globalThis.window`, and either under a cast, as in
+       * `(window as any)`.
+       */
+      const globalObjectName = (node: ESTree.Expression): string | undefined => {
+        const inner = uncast(node);
+        if (inner.type === "Identifier") {
+          return globalObjects.has(inner.name) && isGlobal(inner) ? inner.name : undefined;
         }
-      },
-      ImportExpression(node) {
-        if (node.source.type === "Literal" && typeof node.source.value === "string") {
+        if (inner.type !== "MemberExpression") {
+          return undefined;
+        }
+        const member = memberName(inner);
+        const object = globalObjectName(inner.object);
+        return member !== undefined && globalObjects.has(member) && object !== undefined
+          ? `${object}.${member}`
+          : undefined;
+      };
+      /** Returns the global an expression names: `Date`, or `crypto` in `globalThis.crypto` or `window["crypto"]`. */
+      const globalName = (node: ESTree.Expression): string | undefined => {
+        const inner = uncast(node);
+        if (inner.type === "Identifier") {
+          return watched.has(inner.name) && isGlobal(inner) ? inner.name : undefined;
+        }
+        if (inner.type !== "MemberExpression") {
+          return undefined;
+        }
+        const member = memberName(inner);
+        return member !== undefined && globalObjectName(inner.object) !== undefined
+          ? member
+          : undefined;
+      };
+      /** Reports the import of a module whose import itself reads, and returns its watched exports otherwise. */
+      const watchImport = (
+        node: ESTree.Node,
+        source: string,
+      ): Record<string, string> | undefined => {
+        const module = nodeModule(source);
+        const whole = own(wholeModules, module);
+        if (whole !== undefined) {
+          report(node, `node:${module}`, whole);
+          return undefined;
+        }
+        return own(watchedModules, module);
+      };
+      return {
+        ImportDeclaration(node) {
+          if (node.importKind === "type") {
+            return;
+          }
           const members = watchImport(node, node.source.value);
-          if (members !== undefined) {
-            report(
-              node,
-              `node:${nodeModule(node.source.value)}`,
-              Object.values(members)[0] ?? environment,
-            );
+          if (members === undefined) {
+            return;
           }
-        }
-      },
-      MemberExpression(node) {
-        const member = memberName(node);
-        if (member === undefined) {
-          return;
-        }
-        // `crypto.randomUUID()` through `import * as crypto from "node:crypto"`.
-        const viaImport =
-          node.object.type === "Identifier" ? importedModule(node.object) : undefined;
-        const importedReads =
-          viaImport === undefined ? undefined : own(watchedModules[viaImport] ?? {}, member);
-        if (importedReads !== undefined) {
-          report(node, `node:${viaImport}'s ${member}`, importedReads);
-          return;
-        }
-        if (node.object.type === "MetaProperty") {
-          if (node.object.meta.name === "import" && member === "env") {
-            report(node, "import.meta.env", environment);
+          const module = nodeModule(node.source.value);
+          for (const specifier of node.specifiers) {
+            if (specifier.type !== "ImportSpecifier") {
+              moduleBindings.set(specifier, module);
+              continue;
+            }
+            const name =
+              specifier.imported.type === "Identifier"
+                ? specifier.imported.name
+                : specifier.imported.value;
+            const reads = specifier.importKind === "type" ? undefined : own(members, name);
+            if (reads !== undefined) {
+              report(specifier, `node:${module}'s ${name}`, reads);
+            }
           }
-          return;
-        }
-        const globalObject = globalObjectName(node.object);
-        const read = globalObject === undefined ? undefined : own(watchedGlobals, member);
-        if (read !== undefined) {
-          report(node, `${globalObject}.${member}`, read);
-        }
-        if (globalObject !== undefined) {
-          reportPlatform(node, `${globalObject}.${member}`, member);
-        }
-        const object = globalName(node.object);
-        const members = object === undefined ? undefined : own(watchedMembers, object);
-        const reads = members === undefined ? undefined : own(members, member);
-        if (reads !== undefined) {
-          report(node, `${object}.${member}`, reads);
-        }
-      },
-      // `new Date()` and `Date()` read the clock. A Date built from a value reads nothing.
-      NewExpression(node) {
-        if (globalName(node.callee) === "Date" && node.arguments.length === 0) {
-          report(node, "new Date()", "the clock");
-        }
-      },
-      CallExpression(node) {
-        if (globalName(node.callee) === "Date") {
-          report(node, "Date()", "the clock");
-        }
-      },
-      // A watched global reads whether the code calls it or passes it on, as in `const later = setTimeout`. A type such
-      // as `typeof setTimeout` or `typeof navigator.clipboard` reads nothing, so the rule leaves a type position alone.
-      Identifier(node) {
-        const reads = own(watchedGlobals, node.name);
-        if (reads !== undefined && !inTypeQuery(node) && isGlobal(node)) {
-          report(node, node.name, reads);
-        }
-        if (watchedPlatformGlobals.has(node.name) && isGlobal(node)) {
-          reportPlatform(node, node.name, node.name);
-        }
-      },
-      // `const { now } = Date` takes the member as `Date.now` does, and `const { fetch } = window` as `window.fetch`.
-      VariableDeclarator(node) {
-        if (node.id.type !== "ObjectPattern" || node.init === null) {
-          return;
-        }
-        const globalObject = globalObjectName(node.init);
-        const object = globalName(node.init);
-        const members =
-          globalObject !== undefined
-            ? watchedGlobals
-            : object === undefined
-              ? undefined
-              : own(watchedMembers, object);
-        for (const property of node.id.properties) {
-          const key = keyName(property);
-          const reads = members === undefined || key === undefined ? undefined : own(members, key);
+        },
+        ImportExpression(node) {
+          if (node.source.type === "Literal" && typeof node.source.value === "string") {
+            const members = watchImport(node, node.source.value);
+            if (members !== undefined) {
+              report(
+                node,
+                `node:${nodeModule(node.source.value)}`,
+                Object.values(members)[0] ?? environment,
+              );
+            }
+          }
+        },
+        MemberExpression(node) {
+          const member = memberName(node);
+          if (member === undefined) {
+            return;
+          }
+          // `crypto.randomUUID()` through `import * as crypto from "node:crypto"`.
+          const viaImport =
+            node.object.type === "Identifier" ? importedModule(node.object) : undefined;
+          const importedReads =
+            viaImport === undefined ? undefined : own(watchedModules[viaImport] ?? {}, member);
+          if (importedReads !== undefined) {
+            report(node, `node:${viaImport}'s ${member}`, importedReads);
+            return;
+          }
+          if (node.object.type === "MetaProperty") {
+            if (node.object.meta.name === "import" && member === "env") {
+              report(node, "import.meta.env", environment);
+            }
+            return;
+          }
+          const globalObject = globalObjectName(node.object);
+          const read = globalObject === undefined ? undefined : own(watchedGlobals, member);
+          if (read !== undefined) {
+            report(node, `${globalObject}.${member}`, read);
+          }
+          if (globalObject !== undefined) {
+            reportPlatform(node, `${globalObject}.${member}`, member);
+          }
+          const object = globalName(node.object);
+          const members = object === undefined ? undefined : own(memberReads, object);
+          const reads = members === undefined ? undefined : own(members, member);
           if (reads !== undefined) {
-            report(property, `${globalObject ?? object}.${key}`, reads);
+            report(node, `${object}.${member}`, reads);
           }
-          if (globalObject !== undefined && key !== undefined) {
-            reportPlatform(property, `${globalObject}.${key}`, key);
+        },
+        // `new Date()` and `Date()` read the clock. A Date built from a value reads nothing.
+        NewExpression(node) {
+          if (globalName(node.callee) === "Date" && node.arguments.length === 0) {
+            report(node, "new Date()", "the clock");
           }
-        }
-      },
-    };
-  },
-};
+        },
+        CallExpression(node) {
+          if (globalName(node.callee) === "Date") {
+            report(node, "Date()", "the clock");
+          }
+        },
+        // A watched global reads whether the code calls it or passes it on, as in `const later = setTimeout`. A type such
+        // as `typeof setTimeout` or `typeof navigator.clipboard` reads nothing, so the rule leaves a type position alone.
+        Identifier(node) {
+          const reads = own(watchedGlobals, node.name);
+          if (reads !== undefined && !inTypeQuery(node) && isGlobal(node)) {
+            report(node, node.name, reads);
+          }
+          if (watchedPlatformGlobals.has(node.name) && isGlobal(node)) {
+            reportPlatform(node, node.name, node.name);
+          }
+        },
+        // `const { now } = Date` takes the member as `Date.now` does, and `const { fetch } = window` as `window.fetch`.
+        VariableDeclarator(node) {
+          if (node.id.type !== "ObjectPattern" || node.init === null) {
+            return;
+          }
+          const globalObject = globalObjectName(node.init);
+          const object = globalName(node.init);
+          const members =
+            globalObject !== undefined
+              ? watchedGlobals
+              : object === undefined
+                ? undefined
+                : own(memberReads, object);
+          for (const property of node.id.properties) {
+            const key = keyName(property);
+            const reads =
+              members === undefined || key === undefined ? undefined : own(members, key);
+            if (reads !== undefined) {
+              report(property, `${globalObject ?? object}.${key}`, reads);
+            }
+            if (globalObject !== undefined && key !== undefined) {
+              reportPlatform(property, `${globalObject}.${key}`, key);
+            }
+          }
+        },
+      };
+    },
+  };
+}
 
-export default rule;
+export default newEnvironmentRule();
