@@ -16,6 +16,7 @@ import {
   fileAt,
   isFeatureInfra,
   isPort,
+  isTestKit,
   type Layer,
   type Place,
   place,
@@ -23,7 +24,8 @@ import {
   testFile,
 } from "./places.js";
 import { innerModuleProblem } from "./package-modules.js";
-import { platformProblem } from "./platforms.js";
+import { entrypointPlatformProblems, type PlatformImport, platformProblem } from "./platforms.js";
+import { isGlobal } from "./scope.js";
 import { packageProblem, repositoryImport, UnitKind, unitOfRoot } from "./repository.js";
 
 /** The layers whose modules another module reaches only through a surface file. */
@@ -165,6 +167,17 @@ type ImportNode =
   | ESTree.ExportAllDeclaration
   | ESTree.ImportExpression;
 
+/** Returns the module a string literal, or a template literal without an expression, names, or undefined. */
+function specifierOf(node: ESTree.Node | null | undefined): string | undefined {
+  if (node?.type === "Literal") {
+    return typeof node.value === "string" ? node.value : undefined;
+  }
+  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) {
+    return node.quasis[0]?.value.cooked ?? undefined;
+  }
+  return undefined;
+}
+
 const rule: CreateRule = {
   meta: {
     type: "problem",
@@ -176,42 +189,61 @@ const rule: CreateRule = {
     // the src/ beside that folder.
     const root = from ? from.root : testedSource(context.filename);
     const unit = root === undefined ? undefined : unitOfRoot(root);
-    const check = (node: ImportNode) => {
-      const source = node.source;
-      if (root === undefined || source?.type !== "Literal" || typeof source.value !== "string") {
+    // A test and a test kit are exempt from the platform checks, since they stand in for each platform with fakes.
+    const platformFrom =
+      from && !testFile.test(context.filename) && !isTestKit(context.filename) ? from : undefined;
+    /** The file's imports the platform checks read, as the editor shows them, with the node each reports on. */
+    const platformImports: (PlatformImport & { node: ESTree.Node })[] = [];
+    /** The imports that got a report already, which the entrypoint's platform check passes over. */
+    const reported = new Set<ESTree.Node>();
+    const report = (node: ESTree.Node, message: string) => {
+      reported.add(node);
+      context.report({ node, message });
+    };
+    /** Checks a type import or a `require` only for platforms: the layer checks read the static imports. */
+    const checkPlatform = (node: ESTree.Node, specifier: string | undefined) => {
+      if (platformFrom === undefined || specifier === undefined) {
         return;
       }
-      const named = unit ? repositoryImport(unit, context.filename, source.value) : undefined;
+      const to = placeOfImport(context.filename, specifier);
+      platformImports.push({ node, specifier, to });
+      const problem = platformProblem({ from: platformFrom, specifier, to });
+      if (problem) {
+        report(node, problem);
+      }
+    };
+    const check = (node: ImportNode) => {
+      const specifier = specifierOf(node.source);
+      if (root === undefined || specifier === undefined) {
+        return;
+      }
+      const named = unit ? repositoryImport(unit, context.filename, specifier) : undefined;
       if (named) {
         const problem =
           "problem" in named
             ? named.problem
             : from && packageSurfaceProblem(from, named.layer, named.specifier);
         if (problem) {
-          context.report({ node, message: problem });
+          report(node, problem);
         }
         return;
       }
-      const to = placeOfImport(context.filename, source.value);
-      const isTest = testFile.test(context.filename);
-      // A test is exempt from the platform checks, since it stands in for each platform with fakes.
-      const platform =
-        from && !isTest ? platformProblem({ from, specifier: source.value, to }) : undefined;
-      if (!to) {
-        if (platform) {
-          context.report({ node, message: platform });
-        }
-        return;
+      const to = placeOfImport(context.filename, specifier);
+      if (platformFrom) {
+        platformImports.push({ node, specifier, to });
       }
-      const problem = from
-        ? (memberProblem(from, to, isTest) ??
-          (unit?.kind === UnitKind.Package
-            ? innerModuleProblem({ filename: context.filename, specifier: source.value, to })
-            : undefined) ??
-          platform)
-        : testProblem(to);
+      const platform = platformFrom && platformProblem({ from: platformFrom, specifier, to });
+      const problem = !to
+        ? platform
+        : from
+          ? (memberProblem(from, to, testFile.test(context.filename)) ??
+            (unit?.kind === UnitKind.Package
+              ? innerModuleProblem({ filename: context.filename, specifier, to })
+              : undefined) ??
+            platform)
+          : testProblem(to);
       if (problem) {
-        context.report({ node, message: problem });
+        report(node, problem);
       }
     };
     return {
@@ -241,6 +273,46 @@ const rule: CreateRule = {
       ExportNamedDeclaration: check,
       ExportAllDeclaration: check,
       ImportExpression: check,
+      // `import("wxt/browser").Browser` in a type.
+      TSImportType(node) {
+        checkPlatform(node, specifierOf(node.source));
+      },
+      // `import api = require("@tauri-apps/api")`.
+      TSImportEqualsDeclaration(node) {
+        if (node.moduleReference.type === "TSExternalModuleReference") {
+          checkPlatform(node, specifierOf(node.moduleReference.expression));
+        }
+      },
+      // `require("@tauri-apps/api")`, where `require` is the global and no local of its name.
+      CallExpression(node) {
+        const [argument] = node.arguments;
+        if (
+          node.callee.type === "Identifier" &&
+          node.callee.name === "require" &&
+          node.arguments.length === 1 &&
+          argument !== undefined &&
+          isGlobal(context, node.callee)
+        ) {
+          checkPlatform(node, specifierOf(argument));
+        }
+      },
+      // An entrypoint's platforms take in every import of the file, so the check runs once the file is read.
+      "Program:exit"() {
+        if (platformFrom === undefined) {
+          return;
+        }
+        const problems = entrypointPlatformProblems({
+          filename: context.filename,
+          from: platformFrom,
+          imports: platformImports,
+        });
+        platformImports.forEach(({ node }, index) => {
+          const problem = problems[index];
+          if (problem && !reported.has(node)) {
+            report(node, problem);
+          }
+        });
+      },
     };
   },
 };

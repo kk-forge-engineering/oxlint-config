@@ -3,10 +3,11 @@
 // the program controls none of them. A package's infra reads no environment, since each app's
 // composition root passes the package its config. The console is left to `no-console` in
 // `typescript.json`.
-import type { Context, CreateRule, ESTree, Scope } from "@oxlint/plugins";
+import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
 import { isFeatureInfra, place, testFile } from "./places.js";
 import { UnitKind, unitOfRoot } from "./repository.js";
+import { isGlobal as isGlobalIn, referenceOf } from "./scope.js";
 
 /** What `process.env` and `import.meta.env` read, the one read a package's infra is held to as well. */
 const environment = "the environment";
@@ -163,31 +164,12 @@ const rule: CreateRule = {
         context.report({ node, message: `${name} reads ${reads}, ${packageInfraHint}.` });
       }
     };
-    /** Returns the reference an identifier makes, or undefined when it makes none, as a property name does. */
-    const referenceOf = (node: ESTree.Node) => {
-      for (
-        let scope: Scope | null = context.sourceCode.getScope(node);
-        scope;
-        scope = scope.upper
-      ) {
-        const reference = scope.references.find((candidate) => candidate.identifier === node);
-        if (reference) {
-          return reference;
-        }
-      }
-      return undefined;
-    };
-    /**
-     * Returns whether an identifier is a reference that resolves to a global: a built-in the linter declares, or a name
-     * no scope declares, such as `setTimeout` or `process`. A parameter, an import or a local of that name is no global.
-     */
-    const isGlobal = (node: ESTree.Node): boolean =>
-      context.sourceCode.isGlobalReference(node) || referenceOf(node)?.resolved === null;
+    const isGlobal = (node: ESTree.Node): boolean => isGlobalIn(context, node);
     /** The default and namespace imports of a watched module, by their specifier, as in `import * as crypto`. */
     const moduleBindings = new Map<ESTree.Node, string>();
     /** Returns the watched module a name refers to through a default or namespace import, or undefined. */
     const importedModule = (node: ESTree.Node): string | undefined => {
-      const definition = referenceOf(node)?.resolved?.defs[0];
+      const definition = referenceOf(context, node)?.resolved?.defs[0];
       return definition === undefined ? undefined : moduleBindings.get(definition.node);
     };
     /** The globals any check of the rule names. A name outside this set skips the scope lookup. */

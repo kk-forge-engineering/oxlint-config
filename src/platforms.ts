@@ -3,9 +3,10 @@
 // entrypoint imports an adapter, and an entrypoint imports one platform's code. oxlint lints one file at a time, so the
 // check reads the other files of an entrypoint from disk.
 import { statSync } from "node:fs";
+import { sep } from "node:path";
 
 import { importSpecifiers, sourceFile, sourceFiles } from "./imports.js";
-import { pathFrom, type Place, placeOfImport } from "./places.js";
+import { isTestKit, pathFrom, type Place, placeOfImport } from "./places.js";
 import { newRecent } from "./recent.js";
 
 /** The platforms by the folder of their adapter, `infra/<platform>`. */
@@ -51,19 +52,42 @@ const isOtherEntrypoint = (to: Place | undefined, self: string): to is Place =>
 /** The platforms an entrypoint imports, each with the first import that shows it, as `<file> imports <specifier>`. */
 type Platforms = Map<Platform, string>;
 
+/** A file whose imports the walk takes as given in place of reading the file from disk: the linted file. */
+interface Current {
+  file: string;
+  specifiers: readonly string[];
+}
+
+/** Returns the source files of an entrypoint module, less tests and test kits, with the linted file among them. */
+function entrypointFiles(module: string, current: Current | undefined): string[] {
+  if (module === current?.file || statSync(module, { throwIfNoEntry: false })?.isFile()) {
+    return [module];
+  }
+  const files = sourceFiles(module).filter((file) => !isTestKit(file));
+  return current !== undefined &&
+    current.file.startsWith(module + sep) &&
+    !files.includes(current.file)
+    ? [...files, current.file]
+    : files;
+}
+
 /**
  * Returns the platforms an entrypoint module imports: the SDKs and adapters its files import, and the platforms of the
  * other entrypoints they import, such as those a cumulative entrypoint starts. `seen` holds the entrypoints the walk
- * has entered, so a cycle ends.
+ * has entered, so a cycle ends. The walk takes the linted file's imports from `current`, which holds what the editor
+ * shows, and reads the other files from disk.
  */
-function entrypointPlatforms(root: string, module: string, seen: Set<string>): Platforms {
+function entrypointPlatforms(
+  root: string,
+  module: string,
+  seen: Set<string>,
+  current?: Current,
+): Platforms {
   const found: Platforms = new Map();
   seen.add(module);
-  const files = statSync(module, { throwIfNoEntry: false })?.isFile()
-    ? [module]
-    : sourceFiles(module);
-  for (const file of files) {
-    for (const specifier of importSpecifiers(file)) {
+  for (const file of entrypointFiles(module, current)) {
+    const specifiers = file === current?.file ? current.specifiers : importSpecifiers(file);
+    for (const specifier of specifiers) {
       const sdk = sdkOf(specifier);
       const to = sdk === undefined ? placeOfImport(file, specifier) : undefined;
       const adapter = sdk ?? adapterOf(to);
@@ -71,7 +95,7 @@ function entrypointPlatforms(root: string, module: string, seen: Set<string>): P
         adapter !== undefined
           ? [adapter]
           : isOtherEntrypoint(to, module) && !seen.has(to.module)
-            ? [...entrypointPlatforms(root, to.module, seen).keys()]
+            ? [...entrypointPlatforms(root, to.module, seen, current).keys()]
             : [];
       for (const platform of imported) {
         if (!found.has(platform)) {
@@ -83,26 +107,28 @@ function entrypointPlatforms(root: string, module: string, seen: Set<string>): P
   return found;
 }
 
-/** Holds each entrypoint's platforms for a second, so the files of one entrypoint share one walk. */
+/** Holds the platforms of each entrypoint another one imports for a second, so one run walks it once. */
 const recentPlatforms = newRecent<Platforms>();
 
-const platformsOf = (root: string, module: string): Platforms =>
+const importedEntrypointPlatforms = (root: string, module: string): Platforms =>
   recentPlatforms(module, () => entrypointPlatforms(root, module, new Set()));
 
+/** An import of the linted file: its specifier, and where it places when it names a module of the layers. */
+export interface PlatformImport {
+  specifier: string;
+  to: Place | undefined;
+}
+
 /**
- * Returns why a file under src/ that is no test may not import `specifier`, which places at `to` when it is a module of
- * the layers, or undefined when it may. A platform's SDK stays in its adapter, only an entrypoint imports an adapter,
- * and an entrypoint imports the code of one platform.
+ * Returns why a file under src/ that is no test or test kit may not import `specifier`, which places at `to` when it
+ * names a module of the layers, or undefined when it may. A platform's SDK stays in its adapter, and only an
+ * entrypoint imports an adapter.
  */
 export function platformProblem({
   from,
   specifier,
   to,
-}: {
-  from: Place;
-  specifier: string;
-  to: Place | undefined;
-}): string | undefined {
+}: PlatformImport & { from: Place }): string | undefined {
   const sdk = sdkOf(specifier);
   if (
     sdk !== undefined &&
@@ -119,21 +145,40 @@ export function platformProblem({
   if (adapter !== undefined && from.layer !== "entrypoints" && to?.module !== from.module) {
     return `Only an entrypoint imports infra/${adapter}, the ${adapter} platform's adapter, so the rest of the app runs on every runtime: the composition root passes it in through a port.`;
   }
+  return undefined;
+}
+
+/**
+ * Returns, for an entrypoint's file, why it may not make each of `imports`, the file's imports as the editor shows
+ * them: an entrypoint runs on one runtime, so it imports the code of one platform. When the entrypoint imports two,
+ * each import that brings one gets the problem, and the others get none.
+ */
+export function entrypointPlatformProblems({
+  filename,
+  from,
+  imports,
+}: {
+  filename: string;
+  from: Place;
+  imports: readonly PlatformImport[];
+}): (string | undefined)[] {
   if (from.layer !== "entrypoints") {
-    return undefined;
+    return imports.map(() => undefined);
   }
-  const bringsPlatform =
-    sdk !== undefined ||
-    adapter !== undefined ||
-    (isOtherEntrypoint(to, from.module) && platformsOf(from.root, to.module).size > 0);
-  if (!bringsPlatform) {
-    return undefined;
-  }
-  const found = platformsOf(from.root, from.module);
+  const current = { file: filename, specifiers: imports.map((entry) => entry.specifier) };
+  const found = entrypointPlatforms(from.root, from.module, new Set(), current);
   if (found.size < 2) {
-    return undefined;
+    return imports.map(() => undefined);
   }
   const name = pathFrom(from.root, from.module).replace(sourceFile, "");
   const shown = [...found.values()].join(", and ");
-  return `${name} runs on ${[...found.keys()].join(" and ")}, as ${shown}: an entrypoint runs on one runtime, so it imports one platform's adapter and SDK.`;
+  const problem = `${name} runs on ${[...found.keys()].join(" and ")}, as ${shown}: an entrypoint runs on one runtime, so it imports one platform's adapter and SDK.`;
+  return imports.map(({ specifier, to }) =>
+    sdkOf(specifier) !== undefined ||
+    adapterOf(to) !== undefined ||
+    (isOtherEntrypoint(to, from.module) &&
+      importedEntrypointPlatforms(from.root, to.module).size > 0)
+      ? problem
+      : undefined,
+  );
 }
