@@ -1,8 +1,8 @@
 // The rule `kk-forge/environment`: outside infra, a file under src/ reads neither the clock, random
 // numbers, the environment, chrome.i18n, the network, browser storage, navigator nor location, since
-// the program controls none of them. A package's
-// infra reads no environment, since each app's composition root passes the package its config. The
-// console is left to `no-console` in `typescript.json`.
+// the program controls none of them. A package's infra reads no environment, since each app's
+// composition root passes the package its config. The console is left to `no-console` in
+// `typescript.json`.
 import type { Context, CreateRule, ESTree, Scope } from "@oxlint/plugins";
 
 import { isFeatureInfra, place, testFile } from "./places.js";
@@ -78,15 +78,59 @@ const hint =
 const packageInfraHint =
   "which a package's infra does not read: take the value as a parameter from each app's composition root";
 
-/** Returns the value a record holds for a key it owns, so a key such as `constructor` finds nothing. */
 /**
  * The names of the global object. A browser gives it `window` and `self` too, so `window.location` reads what
  * `location` does. `document.location` is a property of `document`, not of the global object, so it stays out.
  */
 const globalObjects = new Set(["globalThis", "window", "self"]);
 
+/** Returns the value a record holds for a key it owns, so a key such as `constructor` finds nothing. */
 const own = <Value>(record: Record<string, Value>, key: string): Value | undefined =>
   Object.hasOwn(record, key) ? record[key] : undefined;
+
+/** Returns an expression without the casts around it: `as`, `satisfies`, `<T>` and the non-null `!`. */
+function uncast(node: ESTree.Expression): ESTree.Expression {
+  let inner = node;
+  while (
+    inner.type === "TSAsExpression" ||
+    inner.type === "TSSatisfiesExpression" ||
+    inner.type === "TSTypeAssertion" ||
+    inner.type === "TSNonNullExpression"
+  ) {
+    inner = inner.expression;
+  }
+  return inner;
+}
+
+/** Returns the name a string literal, or a template literal without an expression, holds, or undefined. */
+function literalName(node: ESTree.Node): string | undefined {
+  if (node.type === "Literal") {
+    return typeof node.value === "string" ? node.value : undefined;
+  }
+  if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
+    return node.quasis[0]?.value.cooked ?? undefined;
+  }
+  return undefined;
+}
+
+/** Returns the member a member expression reads by name: `x.name`, `x["name"]` or `` x[`name`] ``, or undefined. */
+function memberName(node: ESTree.MemberExpression): string | undefined {
+  if (!node.computed) {
+    return node.property.type === "Identifier" ? node.property.name : undefined;
+  }
+  return literalName(node.property);
+}
+
+/** Returns the name of a destructured property's key, as `fetch` in `{ fetch }`, `{ "fetch": f }` or `{ fetch: f }`. */
+function keyName(property: ESTree.Node): string | undefined {
+  if (property.type !== "Property") {
+    return undefined;
+  }
+  if (!property.computed && property.key.type === "Identifier") {
+    return property.key.name;
+  }
+  return literalName(property.key);
+}
 
 /** Returns whether an identifier is named by a type query, as `navigator` is in `typeof navigator.clipboard`. */
 function inTypeQuery(node: ESTree.Node): boolean {
@@ -152,23 +196,38 @@ const rule: CreateRule = {
       ...Object.keys(watchedGlobals),
       ...globalObjects,
     ]);
-    /** Returns whether an expression names the global object, as a global `globalThis`, `window` or `self`. */
-    const isGlobalObject = (node: ESTree.Node): node is ESTree.IdentifierReference =>
-      node.type === "Identifier" && globalObjects.has(node.name) && isGlobal(node);
-    /** Returns the global an expression names: `Date`, or `crypto` in `globalThis.crypto` or `window.crypto`. */
+    /**
+     * Returns the name an expression gives the global object, or undefined when it names none: a global `globalThis`,
+     * `window` or `self`, one read off another, as in `globalThis.window`, and either under a cast, as in
+     * `(window as any)`.
+     */
+    const globalObjectName = (node: ESTree.Expression): string | undefined => {
+      const inner = uncast(node);
+      if (inner.type === "Identifier") {
+        return globalObjects.has(inner.name) && isGlobal(inner) ? inner.name : undefined;
+      }
+      if (inner.type !== "MemberExpression") {
+        return undefined;
+      }
+      const member = memberName(inner);
+      const object = globalObjectName(inner.object);
+      return member !== undefined && globalObjects.has(member) && object !== undefined
+        ? `${object}.${member}`
+        : undefined;
+    };
+    /** Returns the global an expression names: `Date`, or `crypto` in `globalThis.crypto` or `window["crypto"]`. */
     const globalName = (node: ESTree.Expression): string | undefined => {
-      if (node.type === "Identifier") {
-        return watched.has(node.name) && isGlobal(node) ? node.name : undefined;
+      const inner = uncast(node);
+      if (inner.type === "Identifier") {
+        return watched.has(inner.name) && isGlobal(inner) ? inner.name : undefined;
       }
-      if (
-        node.type === "MemberExpression" &&
-        !node.computed &&
-        node.property.type === "Identifier" &&
-        isGlobalObject(node.object)
-      ) {
-        return node.property.name;
+      if (inner.type !== "MemberExpression") {
+        return undefined;
       }
-      return undefined;
+      const member = memberName(inner);
+      return member !== undefined && globalObjectName(inner.object) !== undefined
+        ? member
+        : undefined;
     };
     /** Reports the import of a module whose import itself reads, and returns its watched exports otherwise. */
     const watchImport = (node: ESTree.Node, source: string): Record<string, string> | undefined => {
@@ -218,10 +277,10 @@ const rule: CreateRule = {
         }
       },
       MemberExpression(node) {
-        if (node.computed || node.property.type !== "Identifier") {
+        const member = memberName(node);
+        if (member === undefined) {
           return;
         }
-        const member = node.property.name;
         // `crypto.randomUUID()` through `import * as crypto from "node:crypto"`.
         const viaImport =
           node.object.type === "Identifier" ? importedModule(node.object) : undefined;
@@ -237,11 +296,10 @@ const rule: CreateRule = {
           }
           return;
         }
-        if (isGlobalObject(node.object)) {
-          const read = own(watchedGlobals, member);
-          if (read !== undefined) {
-            report(node, `${node.object.name}.${member}`, read);
-          }
+        const globalObject = globalObjectName(node.object);
+        const read = globalObject === undefined ? undefined : own(watchedGlobals, member);
+        if (read !== undefined) {
+          report(node, `${globalObject}.${member}`, read);
         }
         const object = globalName(node.object);
         const members = object === undefined ? undefined : own(watchedMembers, object);
@@ -269,21 +327,24 @@ const rule: CreateRule = {
           report(node, node.name, reads);
         }
       },
-      // `const { now } = Date` takes the member as `Date.now` does.
+      // `const { now } = Date` takes the member as `Date.now` does, and `const { fetch } = window` as `window.fetch`.
       VariableDeclarator(node) {
         if (node.id.type !== "ObjectPattern" || node.init === null) {
           return;
         }
+        const globalObject = globalObjectName(node.init);
         const object = globalName(node.init);
-        const members = object === undefined ? undefined : own(watchedMembers, object);
+        const members =
+          globalObject !== undefined
+            ? watchedGlobals
+            : object === undefined
+              ? undefined
+              : own(watchedMembers, object);
         for (const property of node.id.properties) {
-          const key =
-            property.type === "Property" && property.key.type === "Identifier"
-              ? property.key.name
-              : undefined;
+          const key = keyName(property);
           const reads = members === undefined || key === undefined ? undefined : own(members, key);
           if (reads !== undefined) {
-            report(property, `${object}.${key}`, reads);
+            report(property, `${globalObject ?? object}.${key}`, reads);
           }
         }
       },

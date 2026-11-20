@@ -3,3 +3,5 @@ const window = { location: { pathname: "/" }, setTimeout: (run: () => void) => r
 export const path = window.location.pathname;
 export const later = window.setTimeout(() => undefined);
 export const at = (self: { fetch: () => number }) => self.fetch();
+const { location } = window;
+export { location };
