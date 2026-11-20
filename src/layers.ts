@@ -1,7 +1,8 @@
 // The oxlint rule `kk-forge/layers`: a file under src/ imports only the layers its layer may take,
 // and another module only through its surface file. A test in tests/ beside src/ may import any
 // layer, through the surface file too. The rule also checks module importer counts, a feature's
-// surface through src/feature-surface.ts, and monorepo imports through src/repository.ts.
+// surface through src/feature-surface.ts, monorepo imports through src/repository.ts, and each
+// platform's code through src/platforms.ts.
 import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
 
@@ -22,6 +23,7 @@ import {
   testFile,
 } from "./places.js";
 import { innerModuleProblem } from "./package-modules.js";
+import { platformProblem } from "./platforms.js";
 import { packageProblem, repositoryImport, UnitKind, unitOfRoot } from "./repository.js";
 
 /** The layers whose modules another module reaches only through a surface file. */
@@ -191,14 +193,22 @@ const rule: CreateRule = {
         return;
       }
       const to = placeOfImport(context.filename, source.value);
+      const isTest = testFile.test(context.filename);
+      // A test is exempt from the platform checks, since it stands in for each platform with fakes.
+      const platform =
+        from && !isTest ? platformProblem({ from, specifier: source.value, to }) : undefined;
       if (!to) {
+        if (platform) {
+          context.report({ node, message: platform });
+        }
         return;
       }
       const problem = from
-        ? (memberProblem(from, to, testFile.test(context.filename)) ??
+        ? (memberProblem(from, to, isTest) ??
           (unit?.kind === UnitKind.Package
             ? innerModuleProblem({ filename: context.filename, specifier: source.value, to })
-            : undefined))
+            : undefined) ??
+          platform)
         : testProblem(to);
       if (problem) {
         context.report({ node, message: problem });
