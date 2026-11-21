@@ -115,14 +115,14 @@ await test("a platform added as one entry of the table gets every platform check
     cwd: new URL("platforms", import.meta.url),
     encoding: "utf8",
   });
-  const broken = readdirSync(new URL("platforms/src", import.meta.url), {
+  const broken = readdirSync(new URL("platforms", import.meta.url), {
     recursive: true,
     encoding: "utf8",
   })
     .filter((file) => basename(file).startsWith("bad-"))
     .map(
       (file) =>
-        `src/${file} kk-forge-platforms(${basename(file).startsWith("bad-env-") ? "environment" : "layers"})`,
+        `${file} kk-forge-platforms(${basename(file).startsWith("bad-env-") ? "environment" : "layers"})`,
     )
     .toSorted((left, right) => left.localeCompare(right));
   assert.deepEqual(reports(run.stdout), broken, run.stdout + run.stderr);

@@ -9,6 +9,7 @@ import { sep } from "node:path";
 
 import { importSpecifiers, sourceFile, sourceFiles } from "./imports.js";
 import { isTestKit, pathFrom, type Place, placeOfImport } from "./places.js";
+import { repositoryImport, type RepositoryImport, unitOfRoot } from "./repository.js";
 import { newRecent } from "./recent.js";
 
 /** One platform an app runs on: its adapter, its SDK, its global APIs and what an entrypoint may take from the SDK. */
@@ -76,6 +77,7 @@ export const platforms: readonly Platform[] = [
 export interface PlatformImport {
   specifier: string;
   to: Place | undefined;
+  packageAdapter?: Platform | undefined;
 }
 
 /** Returns whether an import's target is another entrypoint than the module `self`. */
@@ -108,6 +110,8 @@ function entrypointFiles(module: string, current: Current | undefined): string[]
 export interface PlatformChecks {
   /** Returns the platform whose adapter a module is, `infra/<adapter>` of an app or a package, or undefined. */
   adapterOf(at: Place | undefined): Platform | undefined;
+  /** Returns the platform a named package adapter serves, or undefined for another package surface. */
+  packageAdapterOf(target: RepositoryImport): Platform | undefined;
   /** Returns the platform whose global API a name is, or undefined. */
   globalOf(name: string): Platform | undefined;
   /**
@@ -144,6 +148,10 @@ export const portAdvice = (platform: Platform, from: Place): string =>
 export function newPlatformChecks(list: readonly Platform[] = platforms): PlatformChecks {
   const adapterOf = (at: Place | undefined): Platform | undefined =>
     at?.layer === "infra" ? list.find((platform) => platform.adapter === at.name) : undefined;
+  const packageAdapterOf = (target: RepositoryImport): Platform | undefined =>
+    target && "layer" in target && target.layer === "infra"
+      ? list.find((platform) => platform.adapter === target.rest.split("/", 1)[0])
+      : undefined;
   const globalOf = (name: string): Platform | undefined =>
     list.find((platform) => platform.globals.includes(name));
   const sdkOf = (specifier: string): Platform | undefined =>
@@ -173,12 +181,15 @@ export function newPlatformChecks(list: readonly Platform[] = platforms): Platfo
   ): Found {
     const found: Found = new Map();
     seen.add(module);
+    const unit = unitOfRoot(root);
     for (const file of entrypointFiles(module, current)) {
       const specifiers = file === current?.file ? current.specifiers : importSpecifiers(file);
       for (const specifier of specifiers) {
         const sdk = sdkOf(specifier);
         const to = sdk === undefined ? placeOfImport(file, specifier) : undefined;
-        const adapter = sdk ?? adapterOf(to);
+        const named =
+          unit && !specifier.startsWith(".") ? repositoryImport(unit, file, specifier) : undefined;
+        const adapter = sdk ?? packageAdapterOf(named) ?? adapterOf(to);
         const imported =
           adapter !== undefined
             ? [adapter]
@@ -203,7 +214,8 @@ export function newPlatformChecks(list: readonly Platform[] = platforms): Platfo
   return {
     adapterOf,
     globalOf,
-    platformProblem({ from, specifier, to, names }) {
+    packageAdapterOf,
+    platformProblem({ from, specifier, to, packageAdapter, names }) {
       const sdk = sdkOf(specifier);
       if (sdk !== undefined && adapterOf(from) !== sdk) {
         const entryApi = from.layer === "entrypoints" ? entryApiOf(sdk, specifier) : undefined;
@@ -222,9 +234,10 @@ export function newPlatformChecks(list: readonly Platform[] = platforms): Platfo
             : "";
         return `${taken} is the ${sdk.adapter} platform's SDK, which only infra/${sdk.adapter} imports: ${portAdvice(sdk, from)}.${entry}`;
       }
-      const adapter = adapterOf(to);
+      const adapter = packageAdapter ?? adapterOf(to);
       if (adapter !== undefined && from.layer !== "entrypoints" && to?.module !== from.module) {
-        return `infra/${adapter.adapter} is the ${adapter.adapter} platform's adapter, which only the entrypoints of its runtime import: ${portAdvice(adapter, from)}.`;
+        const surface = packageAdapter ? specifier : `infra/${adapter.adapter}`;
+        return `${surface} is the ${adapter.adapter} platform's adapter, which only the entrypoints of its runtime import: ${portAdvice(adapter, from)}.`;
       }
       return undefined;
     },
@@ -241,8 +254,9 @@ export function newPlatformChecks(list: readonly Platform[] = platforms): Platfo
       const shown = [...found.values()].join(", and ");
       const runsOn = [...found.keys()].map((platform) => platform.adapter).join(" and ");
       const problem = `${name} runs on ${runsOn}, as ${shown}: an entrypoint runs on one runtime, so it imports one platform's adapter and SDK.`;
-      return imports.map(({ specifier, to }) =>
+      return imports.map(({ specifier, to, packageAdapter }) =>
         sdkOf(specifier) !== undefined ||
+        packageAdapter !== undefined ||
         adapterOf(to) !== undefined ||
         (isOtherEntrypoint(to, from.module) &&
           importedEntrypointPlatforms(from.root, to.module).size > 0)
