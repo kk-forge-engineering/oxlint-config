@@ -6,6 +6,7 @@
 // `no-console` in `typescript.json`.
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
+import { keyName, stringOf } from "./literals.js";
 import { isFeatureInfra, isTestKit, place, testFile } from "./places.js";
 import { newPlatformChecks, type Platform, platforms, portAdvice } from "./platforms.js";
 import { UnitKind, unitOfRoot } from "./repository.js";
@@ -107,34 +108,12 @@ function uncast(node: ESTree.Expression): ESTree.Expression {
   return inner;
 }
 
-/** Returns the name a string literal, or a template literal without an expression, holds, or undefined. */
-function literalName(node: ESTree.Node): string | undefined {
-  if (node.type === "Literal") {
-    return typeof node.value === "string" ? node.value : undefined;
-  }
-  if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
-    return node.quasis[0]?.value.cooked ?? undefined;
-  }
-  return undefined;
-}
-
 /** Returns the member a member expression reads by name: `x.name`, `x["name"]` or `` x[`name`] ``, or undefined. */
 function memberName(node: ESTree.MemberExpression): string | undefined {
   if (!node.computed) {
     return node.property.type === "Identifier" ? node.property.name : undefined;
   }
-  return literalName(node.property);
-}
-
-/** Returns the name of a destructured property's key, as `fetch` in `{ fetch }`, `{ "fetch": f }` or `{ fetch: f }`. */
-function keyName(property: ESTree.Node): string | undefined {
-  if (property.type !== "Property") {
-    return undefined;
-  }
-  if (!property.computed && property.key.type === "Identifier") {
-    return property.key.name;
-  }
-  return literalName(property.key);
+  return stringOf(node.property);
 }
 
 /**
