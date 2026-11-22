@@ -22,6 +22,9 @@
       { "object": "self", "property": "confirm" },
       { "object": "self", "property": "prompt" }
     ],
+    // The key innerHTML or outerHTML in an object literal, as Object.assign or a JSX spread takes it, or in
+    // Reflect.set sets HTML without reading the property, so no-restricted-properties and solid/no-innerhtml miss it.
+    "kk-forge/no-html-key": "error",
     "typescript/no-explicit-any": "error",
     "typescript/ban-ts-comment": "error",
     "typescript/no-non-null-assertion": "error",
@@ -75,6 +78,7 @@
       "files": ["**/*.test.*", "**/*.spec.*", "**/tests/**"],
       "rules": {
         "no-console": "off",
+        "kk-forge/no-html-key": "off",
         "eslint/no-restricted-properties": [
           "error",
           { "object": "self", "property": "alert" },

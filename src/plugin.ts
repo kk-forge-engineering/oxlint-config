@@ -6,6 +6,7 @@ import environment from "./environment.js";
 import launcher from "./launcher.js";
 import layers from "./layers.js";
 import noConditionalMap from "./no-conditional-map.js";
+import noHtmlKey from "./no-html-key.js";
 import noIndexFiles from "./no-index-files.js";
 import noInlineSvg from "./no-inline-svg.js";
 import wxtEntrypointFolder from "./wxt-entrypoint-folder.js";
@@ -17,6 +18,7 @@ const plugin: Plugin = {
     launcher,
     layers,
     "no-conditional-map": noConditionalMap,
+    "no-html-key": noHtmlKey,
     "no-index-files": noIndexFiles,
     "no-inline-svg": noInlineSvg,
     "wxt-entrypoint-folder": wxtEntrypointFolder,

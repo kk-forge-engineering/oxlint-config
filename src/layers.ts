@@ -9,6 +9,7 @@ import { join, sep } from "node:path";
 import type { Context, CreateRule, ESTree } from "@oxlint/plugins";
 
 import { surfaceProblems } from "./feature-surface.js";
+import { stringOf } from "./literals.js";
 import { moduleProblem, portEntities } from "./module-counts.js";
 import {
   allowed,
@@ -167,20 +168,9 @@ type ImportNode =
   | ESTree.ExportAllDeclaration
   | ESTree.ImportExpression;
 
-/** Returns the module a string literal, or a template literal without an expression, names, or undefined. */
-function specifierOf(node: ESTree.Node | null | undefined): string | undefined {
-  if (node?.type === "Literal") {
-    return typeof node.value === "string" ? node.value : undefined;
-  }
-  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) {
-    return node.quasis[0]?.value.cooked ?? undefined;
-  }
-  return undefined;
-}
-
 /** Returns the name an import or export specifier gives, from an identifier or a string. */
 const nameOf = (node: ESTree.Node): string | undefined =>
-  node.type === "Identifier" ? node.name : specifierOf(node);
+  node.type === "Identifier" ? node.name : stringOf(node);
 
 /**
  * Returns the names an import or re-export takes from its module, or undefined when it takes the whole module, as a
@@ -255,7 +245,7 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
         }
       };
       const check = (node: ImportNode) => {
-        const specifier = specifierOf(node.source);
+        const specifier = stringOf(node.source);
         if (root === undefined || specifier === undefined) {
           return;
         }
@@ -336,12 +326,12 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
         ImportExpression: check,
         // `import("sdk").Type` in a type.
         TSImportType(node) {
-          checkPlatform(node, specifierOf(node.source), importTypeName(node));
+          checkPlatform(node, stringOf(node.source), importTypeName(node));
         },
         // `import api = require("sdk")`.
         TSImportEqualsDeclaration(node) {
           if (node.moduleReference.type === "TSExternalModuleReference") {
-            checkPlatform(node, specifierOf(node.moduleReference.expression));
+            checkPlatform(node, stringOf(node.moduleReference.expression));
           }
         },
         // `require("sdk")`, where `require` is the global and no local of its name.
@@ -354,7 +344,7 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
             argument !== undefined &&
             isGlobal(context, node.callee)
           ) {
-            checkPlatform(node, specifierOf(argument));
+            checkPlatform(node, stringOf(argument));
           }
         },
         // An entrypoint's platforms take in every import of the file, so the check runs once the file is read.
