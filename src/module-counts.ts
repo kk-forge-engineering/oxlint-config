@@ -74,15 +74,27 @@ function moduleImports(root: string): Map<string, Target[]> {
   });
 }
 
+/** The src/ folder of an app that a declared pair lets import this one, and the app's folder as the reports name it. */
+export interface ImporterRoot {
+  root: string;
+  app: string;
+}
+
 /**
  * Returns the names of the modules of `consumerLayers`, other than `entity` itself, that import the entities module
- * `entity`, sorted.
+ * `entity`, sorted. A module of an app in `importers` counts too, named with its app, as `apps/a/features/x`.
  */
-function consumersOf(root: string, entity: string): string[] {
-  return [...moduleImports(root)]
-    .filter(([module, targets]) => module !== entity && targets.some((to) => to.module === entity))
-    .map(([module]) => nameOf(root, module))
-    .toSorted((left, right) => left.localeCompare(right));
+function consumersOf(root: string, entity: string, importers: readonly ImporterRoot[]): string[] {
+  const named = (from: string, prefix: string) =>
+    [...moduleImports(from)]
+      .filter(
+        ([module, targets]) => module !== entity && targets.some((to) => to.module === entity),
+      )
+      .map(([module]) => `${prefix}${nameOf(from, module)}`);
+  return [
+    ...named(root, ""),
+    ...importers.flatMap((importer) => named(importer.root, `${importer.app}/`)),
+  ].toSorted((left, right) => left.localeCompare(right));
 }
 
 /** Returns the names of the features modules that the files of an orchestration module import, sorted. */
@@ -125,9 +137,9 @@ const entityHint = "since an entity is what two or more of them share";
 const orchestrationHint =
   "since an orchestration module builds one action from two or more features";
 
-function entityProblem(from: Place): string | undefined {
+function entityProblem(from: Place, importers: readonly ImporterRoot[]): string | undefined {
   const name = nameOf(from.root, from.module);
-  const consumers = consumersOf(from.root, from.module);
+  const consumers = consumersOf(from.root, from.module, importers);
   const [only] = consumers;
   if (only === undefined) {
     return `No features, orchestration or entities module imports ${name}: move it into the module that uses it, ${entityHint}.`;
@@ -156,13 +168,18 @@ function orchestrationProblem(from: Place): string | undefined {
 
 /**
  * Returns why the entities or orchestration module of a file imports or is imported too little, or undefined when it
- * does not, or when the file is not where the check reports on its module.
+ * does not, or when the file is not where the check reports on its module. `importers` are the apps a declared pair
+ * lets import this one, whose imports of an entity count as well.
  */
-export function moduleProblem(filename: string, from: Place): string | undefined {
+export function moduleProblem(
+  filename: string,
+  from: Place,
+  importers: readonly ImporterRoot[] = [],
+): string | undefined {
   if ((from.layer !== "entities" && from.layer !== "orchestration") || !isAnchor(filename, from)) {
     return undefined;
   }
-  return from.layer === "entities" ? entityProblem(from) : orchestrationProblem(from);
+  return from.layer === "entities" ? entityProblem(from, importers) : orchestrationProblem(from);
 }
 
 /**

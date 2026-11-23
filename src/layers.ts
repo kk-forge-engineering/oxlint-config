@@ -32,6 +32,7 @@ import { specifierProblem } from "./specifiers.js";
 import {
   appImportsOf,
   packageProblem,
+  pairImporters,
   repositoryImport,
   UnitKind,
   unitOfRoot,
@@ -340,7 +341,9 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
       return {
         Program(node) {
           for (const problem of [
-            from ? moduleProblem(context.filename, from) : undefined,
+            from
+              ? moduleProblem(context.filename, from, pairImporters(unit, appImports))
+              : undefined,
             packageProblem(context.filename),
           ]) {
             if (problem) {

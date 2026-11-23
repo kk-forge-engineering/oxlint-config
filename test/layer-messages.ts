@@ -107,4 +107,19 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
       "apps/web/src/shared/bad-subpath-narrow.ts",
       'Import #/shared/narrow/bad-other-app through #/ or #tests/, not through #/shared/narrow/*, a key of apps/web/package.json the layers do not read: they read only "imports": { "#/*": "./src/*", "#tests/*": "./tests/*" }.',
     ],
+    [
+      "layers",
+      "src/features/a/bad-tests-helper.ts",
+      "Code under src/ imports no test helper, so #tests/helpers stays with the tests that import it.",
+    ],
+    [
+      "layers",
+      "src/shared/bad-tests-path.ts",
+      "Code under src/ imports no test helper, so ../../tests/helpers stays with the tests that import it.",
+    ],
+    [
+      "app-pairs",
+      "apps/web/src/entities/lone/bad-lone.ts",
+      "Only apps/desktop/features/own imports entities/lone: move it into apps/desktop/features/own, since an entity is what two or more of them share.",
+    ],
   ];

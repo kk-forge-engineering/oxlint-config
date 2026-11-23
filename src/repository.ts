@@ -6,6 +6,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 
 import { importSpecifiers, sourceFiles } from "./imports.js";
+import type { ImporterRoot } from "./module-counts.js";
 import { declarationFile, importTarget, isLayer, type Layer, pathFrom } from "./places.js";
 import { newRecent } from "./recent.js";
 import { ownSrcProblem } from "./subpath-imports.js";
@@ -154,6 +155,20 @@ export function appImportsOf(options: readonly unknown[]): AppImports {
       Array.isArray(targets) ? targets.filter((target) => typeof target === "string") : [],
     ]),
   );
+}
+
+/**
+ * Returns the src/ folders of the apps whose declared pairs let them import `unit`, with each app's folder, so the
+ * counts of `unit`'s modules take in their imports.
+ */
+export function pairImporters(unit: Unit | undefined, appImports: AppImports): ImporterRoot[] {
+  if (unit?.kind !== UnitKind.App) {
+    return [];
+  }
+  const folder = folderOf(unit);
+  return [...appImports]
+    .filter(([, targets]) => targets.includes(folder))
+    .map(([app]) => ({ root: join(unit.repo, app, "src"), app }));
 }
 
 /** Returns what an import by name of app `to` names through its package.json `exports`, or why the form is wrong. */
