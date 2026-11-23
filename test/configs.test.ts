@@ -6,6 +6,8 @@ import { basename, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { layerMessages } from "./layer-messages.ts";
+
 // The test runs oxlint with no flags in fixtures/, whose config only extends
 // typescript.json, solid.json and vitest.json, as a consumer's config does.
 // So the run also shows that typeAware and denyWarnings reach it through
@@ -221,20 +223,31 @@ await test("the packed package", async (packedPackage) => {
     join(installed, "consumer.json"),
     JSON.stringify({ extends: ["./node_modules/@kk-forge/oxlint-config/layers.json"] }),
   );
+  // The config for test/app-pairs lets apps/desktop import apps/web and apps/tool by name, as a consumer's config would.
+  writeFileSync(
+    join(installed, "app-pairs.json"),
+    JSON.stringify({
+      extends: ["./node_modules/@kk-forge/oxlint-config/layers.json"],
+      rules: {
+        "kk-forge/layers": ["error", { apps: { "apps/desktop": ["apps/web", "apps/tool"] } }],
+      },
+    }),
+  );
   const stdouts = new Map<string, string>();
   // A fixture's bad-* files each break one rule, bad-env-* the environment one. test/standalone lays out apps/ and
   // packages/ under a root that declares no workspaces, so it holds no bad-* file and gets no report.
-  for (const { fixture, folders } of [
+  for (const { fixture, folders, config = "consumer.json" } of [
     { fixture: "layers", folders: ["src", "tests"] },
     { fixture: "monorepo", folders: ["apps", "packages"] },
     { fixture: "standalone", folders: ["apps", "packages"] },
+    { fixture: "app-pairs", folders: ["apps"], config: "app-pairs.json" },
   ]) {
     await packedPackage.test(
       `layers.json reports each problem of the ${fixture} fixture and nothing else`,
       () => {
         const run = spawnSync(
           "npx",
-          ["oxlint", "-c", join(installed, "consumer.json"), "--format", "unix"],
+          ["oxlint", "-c", join(installed, config), "--format", "unix"],
           { cwd: new URL(fixture, import.meta.url), encoding: "utf8" },
         );
         stdouts.set(fixture, run.stdout);
@@ -278,6 +291,20 @@ await test("the packed package", async (packedPackage) => {
         "No app or other package imports @mono/unused: delete it, since a package holds the code that two or more apps use.",
         stdout,
       );
+    },
+  );
+
+  await packedPackage.test(
+    "layers.json names the problem of each subpath, alias and app pair",
+    () => {
+      for (const [fixture, file, message] of layerMessages) {
+        const stdout = stdouts.get(fixture) ?? "";
+        const reported = new RegExp(
+          `^${file}:\\d+:\\d+: (.*) \\[Error/kk-forge\\(layers\\)\\]$`,
+          "m",
+        ).exec(stdout)?.[1];
+        assert.equal(reported, message, `${fixture}/${file}\n${stdout}`);
+      }
     },
   );
 

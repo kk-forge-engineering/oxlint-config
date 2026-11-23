@@ -22,12 +22,20 @@ import {
   type Place,
   place,
   placeOfImport,
+  placeOfTarget,
   testFile,
 } from "./places.js";
 import { innerModuleProblem } from "./package-modules.js";
 import { newPlatformChecks, type Platform, type PlatformImport, platforms } from "./platforms.js";
 import { isGlobal } from "./scope.js";
-import { packageProblem, repositoryImport, UnitKind, unitOfRoot } from "./repository.js";
+import { specifierProblem } from "./specifiers.js";
+import {
+  appImportsOf,
+  packageProblem,
+  repositoryImport,
+  UnitKind,
+  unitOfRoot,
+} from "./repository.js";
 
 /** The layers whose modules another module reaches only through a surface file. */
 const published = new Set<Layer>(["orchestration", "features", "entities", "shared"]);
@@ -208,8 +216,21 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
       docs: {
         description: "Keeps imports inside the layers and behind each module’s surface file",
       },
+      schema: [
+        {
+          type: "object",
+          properties: {
+            apps: {
+              type: "object",
+              additionalProperties: { type: "array", items: { type: "string" } },
+            },
+          },
+          additionalProperties: false,
+        },
+      ],
     },
     create(context: Context) {
+      const appImports = appImportsOf(context.options);
       const from = place(context.filename);
       // A file under src/ is a member of its module, a unit test beside its code included. A test in tests/ belongs to
       // the src/ beside that folder.
@@ -226,17 +247,34 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
         reported.add(node);
         context.report({ node, message });
       };
-      /** Checks a type import or a `require` only for platforms: the layer checks read the static imports. */
+      /** Reports what `specifierProblem` finds wrong with a specifier, and returns whether it did. */
+      const reportSpecifier = (node: ESTree.Node, specifier: string): boolean => {
+        const problem = specifierProblem(context.filename, specifier, root);
+        if (problem) {
+          report(node, problem);
+        }
+        return problem !== undefined;
+      };
+      /** Checks a type import or a `require` for a tool's alias and for platforms: the layer checks read the static imports. */
       const checkPlatform = (
         node: ESTree.Node,
         specifier: string | undefined,
         names?: readonly string[],
       ) => {
-        if (platformFrom === undefined || specifier === undefined) {
+        if (
+          specifier === undefined ||
+          reportSpecifier(node, specifier) ||
+          platformFrom === undefined
+        ) {
           return;
         }
-        const to = placeOfImport(context.filename, specifier);
-        const named = unit ? repositoryImport(unit, context.filename, specifier) : undefined;
+        const named = unit
+          ? repositoryImport(unit, context.filename, specifier, appImports)
+          : undefined;
+        const to =
+          named && "target" in named
+            ? placeOfTarget(named.target)
+            : placeOfImport(context.filename, specifier);
         const entry = { node, specifier, to, packageAdapter: checks.packageAdapterOf(named) };
         platformImports.push(entry);
         const problem = checks.platformProblem({ ...entry, from: platformFrom, names });
@@ -246,11 +284,13 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
       };
       const check = (node: ImportNode) => {
         const specifier = stringOf(node.source);
-        if (root === undefined || specifier === undefined) {
+        if (specifier === undefined || reportSpecifier(node, specifier) || root === undefined) {
           return;
         }
-        const named = unit ? repositoryImport(unit, context.filename, specifier) : undefined;
-        if (named) {
+        const named = unit
+          ? repositoryImport(unit, context.filename, specifier, appImports)
+          : undefined;
+        if (named && !("target" in named)) {
           if ("problem" in named) {
             report(node, named.problem);
             return;
@@ -276,7 +316,8 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
           }
           return;
         }
-        const to = placeOfImport(context.filename, specifier);
+        // An app the option lets this app import resolves into its src/, which the checks place as this app's own.
+        const to = named ? placeOfTarget(named.target) : placeOfImport(context.filename, specifier);
         if (platformFrom) {
           platformImports.push({ node, specifier, to });
         }

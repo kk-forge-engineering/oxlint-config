@@ -2,6 +2,8 @@
   "compilerOptions": {
     "module": "nodenext",
     "noEmit": true,
+    // node --test runs the test files as written, so one imports another by its .ts name.
+    "allowImportingTsExtensions": true,
     "types": ["node"]
   },
   "include": ["src", "test/*.ts"]

@@ -4,6 +4,7 @@
   // dist/*.js alone.
   "compilerOptions": {
     "noEmit": false,
+    "allowImportingTsExtensions": false,
     "declaration": true,
     "outDir": "dist",
     "rootDir": "src"

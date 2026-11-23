@@ -1,4 +1,8 @@
 {
   "name": "@mono/web",
-  "private": true
+  "private": true,
+  "imports": {
+    "#/*": "./src/*",
+    "#/shared/narrow/*": "./src/features/game/*"
+  }
 }

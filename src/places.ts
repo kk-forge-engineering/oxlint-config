@@ -2,7 +2,9 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 
+import { subpathImport } from "./subpath-imports.js";
 import { aliasTarget } from "./tsconfig.js";
+import { appTarget } from "./workspace.js";
 
 /**
  * Maps each layer to the layers it may import. Features link only through orchestration and entrypoints, and
@@ -92,19 +94,30 @@ export function fileAt(path: string): string | undefined {
   );
 }
 
-/**
- * Returns the path a specifier names from `filename`, or undefined for a package. A specifier that is no relative path
- * resolves through the `paths` of the file's tsconfig.json, and one no pattern matches is a package.
+/** Returns whether a path names a folder or a file, with or without its extension. */
+const isPresent = (path: string): boolean => existsSync(path) || fileAt(path) !== undefined;
+
+/** Returns the path a specifier names from `filename`, or undefined for a package or a `#` import
+ * of the wrong form. A `#` specifier resolves through package.json `imports`, another bare one
+ * through tsconfig.json `paths`, then as an app of its repository through that app's `exports`.
  */
 export function importTarget(filename: string, specifier: string): string | undefined {
-  return specifier.startsWith(".")
-    ? resolve(dirname(filename), specifier)
-    : aliasTarget(filename, specifier, (path) => existsSync(path) || fileAt(path) !== undefined);
+  if (specifier.startsWith(".")) {
+    return resolve(dirname(filename), specifier);
+  }
+  const subpath = subpathImport(filename, specifier);
+  if (subpath) {
+    return "target" in subpath ? subpath.target : undefined;
+  }
+  return aliasTarget(filename, specifier, isPresent) ?? appTarget(filename, specifier);
 }
 
 /** Returns the module a specifier names from `filename`, or undefined outside the layers or for a package. */
-export function placeOfImport(filename: string, specifier: string): Place | undefined {
-  const target = importTarget(filename, specifier);
+export const placeOfImport = (filename: string, specifier: string): Place | undefined =>
+  placeOfTarget(importTarget(filename, specifier));
+
+/** Returns the module an import's resolved path names, or undefined outside the layers or for no path. */
+export function placeOfTarget(target: string | undefined): Place | undefined {
   const to = target === undefined ? undefined : place(target);
   if (!to) {
     return undefined;

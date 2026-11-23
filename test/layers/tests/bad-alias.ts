@@ -1,2 +1,2 @@
-import { own } from "@/features/a/own";
+import { own } from "#/features/a/own";
 export { own };

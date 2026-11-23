@@ -1,2 +1,2 @@
-import { a } from "~/features/a/exports";
+import { a } from "#/features/a/exports";
 export { a };
