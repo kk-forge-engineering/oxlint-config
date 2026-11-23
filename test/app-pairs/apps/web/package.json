@@ -1,0 +1,10 @@
+{
+  "name": "@pair/web",
+  "private": true,
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "exports": {
+    "./*": "./src/*"
+  }
+}

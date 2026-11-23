@@ -1,4 +1,10 @@
 {
   "name": "@mono/api",
-  "private": true
+  "private": true,
+  "imports": {
+    "#/*": {
+      "types": "./src/*"
+    },
+    "#src/*": "./src/*"
+  }
 }

@@ -1,0 +1,8 @@
+{
+  "name": "@pair/tool",
+  "private": true,
+  "exports": {
+    "./*": "./src/*",
+    "./x": "./dist/x.js"
+  }
+}

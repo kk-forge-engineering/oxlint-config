@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "imports": {
+    "#/*": "./src/*",
+    "#tests/*": "./tests/*"
+  }
+}
