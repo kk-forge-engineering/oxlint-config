@@ -149,7 +149,8 @@ function entityProblem(from: Place, importers: readonly ImporterRoot[]): string 
   }
   // The message sends the entity into a feature, not an orchestration module. An orchestration module holds no logic of
   // its own.
-  const destination = only.startsWith("orchestration/") ? `a feature that ${only} uses` : only;
+  // A paired app's module carries its app's folder before the layer, as `apps/a/orchestration/x`.
+  const destination = /(^|\/)orchestration\//.test(only) ? `a feature that ${only} uses` : only;
   return `Only ${only} imports ${name}: move it into ${destination}, ${entityHint}.`;
 }
 

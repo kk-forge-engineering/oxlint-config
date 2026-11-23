@@ -127,4 +127,9 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
       "src/bad-tests-outside-layer.ts",
       "Code under src/ imports no test helper, so #tests/helpers stays with the tests that import it.",
     ],
+    [
+      "app-pairs",
+      "apps/web/src/entities/relay/bad-relay.ts",
+      "Only apps/desktop/orchestration/sync imports entities/relay: move it into a feature that apps/desktop/orchestration/sync uses, since an entity is what two or more of them share.",
+    ],
   ];

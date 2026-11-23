@@ -56,6 +56,12 @@ function scopeOf(dir: string): Scope | undefined {
   });
 }
 
+/** Returns the folder of the package.json nearest to a file, whose src/ and tests/ `#/` and `#tests/` name. */
+export function packageRoot(filename: string): string | undefined {
+  const scope = scopeOf(dirname(filename));
+  return scope === undefined ? undefined : dirname(scope.file);
+}
+
 /** Returns whether an `imports` key matches a specifier: exactly, or as a pattern with one `*`. */
 function matches(key: string, specifier: string): boolean {
   const star = key.indexOf("*");
