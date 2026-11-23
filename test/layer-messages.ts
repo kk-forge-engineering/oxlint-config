@@ -122,4 +122,9 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
       "apps/web/src/entities/lone/bad-lone.ts",
       "Only apps/desktop/features/own imports entities/lone: move it into apps/desktop/features/own, since an entity is what two or more of them share.",
     ],
+    [
+      "layers",
+      "src/bad-tests-outside-layer.ts",
+      "Code under src/ imports no test helper, so #tests/helpers stays with the tests that import it.",
+    ],
   ];

@@ -167,7 +167,7 @@ export function pairImporters(unit: Unit | undefined, appImports: AppImports): I
   }
   const folder = folderOf(unit);
   return [...appImports]
-    .filter(([, targets]) => targets.includes(folder))
+    .filter(([app, targets]) => app !== folder && targets.includes(folder))
     .map(([app]) => ({ root: join(unit.repo, app, "src"), app }));
 }
 
