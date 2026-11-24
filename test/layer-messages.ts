@@ -27,12 +27,17 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
     [
       "layers",
       "src/shared/bad-tsconfig-alias.ts",
-      `Import #paths/shared/log through ${subpath}, since it names this src/ another way.`,
+      `Import paths/shared/log through ${subpath}, since it names this src/ another way.`,
     ],
     [
       "layers",
       "src/shared/bad-hash-undeclared.ts",
-      "Import #/shared/log through #src/ or #tests/: neither package.json's imports nor tsconfig.json's paths declare it.",
+      "Import #/shared/log through #src/ or #tests/: the layers read no other # name but a platform's SDK, so a file outside src/ and tests/ goes through a relative path or a package.",
+    ],
+    [
+      "layers",
+      "src/shared/bad-hash-paths-alias.ts",
+      "Import #vendor/log through #src/ or #tests/: the layers read no other # name but a platform's SDK, so a file outside src/ and tests/ goes through a relative path or a package.",
     ],
     ["layers", "src/features/a/bad-alias.ts", "features may not import features."],
     ["layers", "src/entities/user/bad-alias.ts", "entities may not import features."],

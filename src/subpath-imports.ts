@@ -119,8 +119,8 @@ export type SubpathImport = { target: string } | { problem: string } | undefined
 /**
  * Returns what a specifier names through the `imports` of the importing file's package.json. A `#src/` specifier needs
  * `"#src/*": "./src/*"` there, or its form for a project that Node runs from its build, a `#tests/` one `"#tests/*": "./tests/*"`, and a specifier another key of `imports`
- * matches takes the wrong form. A `#` specifier that no key matches, such as WXT's `#imports`, is left to the
- * tsconfig.json `paths`.
+ * matches takes the wrong form. A `#` specifier that no key matches, such as WXT's `#imports`, returns undefined, and
+ * src/specifiers.ts judges it.
  */
 export function subpathImport(filename: string, specifier: string): SubpathImport {
   if (!specifier.startsWith("#")) {
