@@ -1,3 +1,3 @@
 // The build form takes the conditions source and default alone.
-import { log } from "#/shared/log";
+import { log } from "#src/shared/log";
 export const message = log;

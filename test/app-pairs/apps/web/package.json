@@ -2,7 +2,7 @@
   "name": "@pair/web",
   "private": true,
   "imports": {
-    "#/*": "./src/*"
+    "#src/*": "./src/*"
   },
   "exports": {
     "./*": "./src/*"

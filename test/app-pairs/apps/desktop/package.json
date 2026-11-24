@@ -2,7 +2,7 @@
   "name": "@pair/desktop",
   "private": true,
   "imports": {
-    "#/*": "./src/*"
+    "#src/*": "./src/*"
   },
   "exports": {
     "./*": "./src/*"

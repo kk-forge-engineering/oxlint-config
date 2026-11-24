@@ -2,7 +2,7 @@
   "name": "@mono/built-default",
   "private": true,
   "imports": {
-    "#/*": {
+    "#src/*": {
       "source": "./src/*",
       "default": "./lib/*"
     }

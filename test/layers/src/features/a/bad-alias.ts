@@ -1,2 +1,2 @@
-import { y } from "#/features/b/internal";
+import { y } from "#src/features/b/internal";
 export { y };

@@ -1,4 +1,4 @@
-import type { Book } from "#/entities/book/exports";
+import type { Book } from "#src/entities/book/exports";
 
 export interface Shelf {
   books: Book[];

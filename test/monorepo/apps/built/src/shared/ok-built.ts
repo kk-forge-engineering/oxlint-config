@@ -1,2 +1,2 @@
-import { log } from "#/shared/log";
+import { log } from "#src/shared/log";
 export const message = log;

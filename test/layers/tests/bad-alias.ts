@@ -1,2 +1,2 @@
-import { own } from "#/features/a/own";
+import { own } from "#src/features/a/own";
 export { own };

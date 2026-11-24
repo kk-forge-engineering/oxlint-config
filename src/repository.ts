@@ -213,7 +213,7 @@ export function repositoryImport(
   const byName = specifier.startsWith(".") ? undefined : named.get(name);
   const target = byName ? undefined : importTarget(filename, specifier);
   const to = byName ?? (target === undefined ? undefined : unitOfPath(from.repo, target));
-  // An app names its own src/ through #/, so its own name would only hide an import from the checks.
+  // An app names its own src/ through #src/, so its own name would only hide an import from the checks.
   if (byName?.kind === UnitKind.App && byName.dir === from.dir) {
     return {
       problem: ownSrcProblem(specifier),

@@ -1,7 +1,7 @@
-// Resolves an import such as `#/features/a/exports` through the `imports` field of the package.json nearest to the
+// Resolves an import such as `#src/features/a/exports` through the `imports` field of the package.json nearest to the
 // importing file. Each app and package of a monorepo so names its own src/. The layers read two keys only,
-// `"#/*": "./src/*"` and `"#tests/*": "./tests/*"` for the test helpers beside src/, so each means the same in every
-// project, and any other form is a problem the rule reports. A project that Node runs from its build may write `#/*`
+// `"#src/*": "./src/*"` and `"#tests/*": "./tests/*"` for the test helpers beside src/, so each means the same in every
+// project, and any other form is a problem the rule reports. A project that Node runs from its build may write `#src/*`
 // as `{ "source": "./src/*", "default": "./dist/*" }`: tools that take the "source" condition read src/, and Node
 // reads dist/.
 import { existsSync } from "node:fs";
@@ -12,7 +12,7 @@ import { holdsRefusedSegment, manifestField } from "./workspace.js";
 
 /** The subpath imports the layers read: each key, its target, the folder it names and the prefix a specifier takes. */
 const forms = [
-  { key: "#/*", target: "./src/*", folder: "src", prefix: "#/" },
+  { key: "#src/*", target: "./src/*", folder: "src", prefix: "#src/" },
   { key: "#tests/*", target: "./tests/*", folder: "tests", prefix: "#tests/" },
 ] as const;
 
@@ -20,16 +20,16 @@ const forms = [
 const declarationOf = (declared: readonly { key: string; target: string }[]): string =>
   `"imports": { ${declared.map(({ key, target }) => `"${key}": "${target}"`).join(", ")} }`;
 
-/** The conditions of the `#/*` form for a project that Node runs from its build, in the order Node tries them. */
+/** The conditions of the `#src/*` form for a project that Node runs from its build, in the order Node tries them. */
 const builtForm = [
   ["source", "./src/*"],
   ["default", "./dist/*"],
 ] as const;
 
-/** How package.json writes the `#/*` form for a project that Node runs from its build, for the reports. */
-const builtDeclaration = `"imports": { "#/*": { ${builtForm.map(([condition, target]) => `"${condition}": "${target}"`).join(", ")} } }`;
+/** How package.json writes the `#src/*` form for a project that Node runs from its build, for the reports. */
+const builtDeclaration = `"imports": { "#src/*": { ${builtForm.map(([condition, target]) => `"${condition}": "${target}"`).join(", ")} } }`;
 
-/** Returns whether an `imports` value is the `#/*` form for a project that Node runs from its build, keys in order. */
+/** Returns whether an `imports` value is the `#src/*` form for a project that Node runs from its build, keys in order. */
 function isBuiltForm(value: unknown): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
@@ -46,19 +46,19 @@ function isBuiltForm(value: unknown): boolean {
 /** Returns whether package.json declares a form as the layers read it. */
 const declares = (scope: Scope | undefined, form: (typeof forms)[number]): boolean => {
   const value = scope?.imports.get(form.key);
-  return value === form.target || (form.key === "#/*" && isBuiltForm(value));
+  return value === form.target || (form.key === "#src/*" && isBuiltForm(value));
 };
 
-/** Returns the forms a report names for a prefix: `#/` has two, `#tests/` one. */
+/** Returns the forms a report names for a prefix: `#src/` has two, `#tests/` one. */
 const formsOf = (form: (typeof forms)[number]): string =>
-  form.key === "#/*"
+  form.key === "#src/*"
     ? `${declarationOf([form])} or ${builtDeclaration}, the forms`
     : `${declarationOf([form])}, the one form`;
 
-/** The `#/` form as a report names it, the one way to import from the file's own src/. */
-export const srcSubpathImport = `#/, which package.json declares as ${declarationOf([forms[0]])}`;
+/** The `#src/` form as a report names it, the one way to import from the file's own src/. */
+export const srcSubpathImport = `#src/, which package.json declares as ${declarationOf([forms[0]])}`;
 
-/** Returns why a specifier that names the importing file's own src/ other than through `#/` fails. */
+/** Returns why a specifier that names the importing file's own src/ other than through `#src/` fails. */
 export const ownSrcProblem = (specifier: string): string =>
   `Import ${specifier} through ${srcSubpathImport}, since it names this src/ another way.`;
 
@@ -93,7 +93,7 @@ function scopeOf(dir: string): Scope | undefined {
   });
 }
 
-/** Returns the folder of the package.json nearest to a file, whose src/ and tests/ `#/` and `#tests/` name. */
+/** Returns the folder of the package.json nearest to a file, whose src/ and tests/ `#src/` and `#tests/` name. */
 export function packageRoot(filename: string): string | undefined {
   const scope = scopeOf(dirname(filename));
   return scope === undefined ? undefined : dirname(scope.file);
@@ -117,8 +117,8 @@ function matches(key: string, specifier: string): boolean {
 export type SubpathImport = { target: string } | { problem: string } | undefined;
 
 /**
- * Returns what a specifier names through the `imports` of the importing file's package.json. A `#/` specifier needs
- * `"#/*": "./src/*"` there, or its form for a project that Node runs from its build, a `#tests/` one `"#tests/*": "./tests/*"`, and a specifier another key of `imports`
+ * Returns what a specifier names through the `imports` of the importing file's package.json. A `#src/` specifier needs
+ * `"#src/*": "./src/*"` there, or its form for a project that Node runs from its build, a `#tests/` one `"#tests/*": "./tests/*"`, and a specifier another key of `imports`
  * matches takes the wrong form. A `#` specifier that no key matches, such as WXT's `#imports`, is left to the
  * tsconfig.json `paths`.
  */
@@ -128,7 +128,7 @@ export function subpathImport(filename: string, specifier: string): SubpathImpor
   }
   const scope = scopeOf(dirname(filename));
   const manifest = scope ? relative(process.cwd(), scope.file) || "package.json" : "package.json";
-  // Any other key that matches decides where the import goes, a narrower one inside #/ included, as Node takes the
+  // Any other key that matches decides where the import goes, a narrower one inside #src/ included, as Node takes the
   // longest match, so it fails before the forms are read.
   const key = scope
     ? [...scope.imports.keys()].find(
@@ -137,7 +137,7 @@ export function subpathImport(filename: string, specifier: string): SubpathImpor
     : undefined;
   if (key !== undefined) {
     return {
-      problem: `Import ${specifier} through #/ or #tests/, not through ${key}, a key of ${manifest} the layers do not read: they read only ${declarationOf(forms)}.`,
+      problem: `Import ${specifier} through #src/ or #tests/, not through ${key}, a key of ${manifest} the layers do not read: they read only ${declarationOf(forms)}.`,
     };
   }
   const form = forms.find(({ prefix }) => specifier.startsWith(prefix));

@@ -1,5 +1,5 @@
 // What a specifier must not be, whatever it imports: a tool's alias, a subpath import of the wrong form, or a second
-// name for the importing file's own src/, which `#/` names. Each would let an import pass the layer checks unseen.
+// name for the importing file's own src/, which `#src/` names. Each would let an import pass the layer checks unseen.
 // Code under src/ also imports nothing from the tests/ beside it, which only tests run.
 import { isAbsolute, join, relative, sep } from "node:path";
 
@@ -40,7 +40,7 @@ function importsTests(filename: string, specifier: string, target: string | unde
 }
 
 /**
- * Returns why a specifier takes another way than `#/` or `#tests/`, or undefined when it does not: a tool's alias, a
+ * Returns why a specifier takes another way than `#src/` or `#tests/`, or undefined when it does not: a tool's alias, a
  * subpath import of the wrong form, or any other name that resolves into `root`, the src/ the file belongs to, such
  * as a tsconfig.json alias or the app's own name. One that names something else, such as WXT's `#imports`, passes.
  * A file under src/ that is no test or test kit may not import from the tests/ beside it, by `#tests/` or by path.

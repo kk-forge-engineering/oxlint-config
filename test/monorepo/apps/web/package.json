@@ -2,7 +2,7 @@
   "name": "@mono/web",
   "private": true,
   "imports": {
-    "#/*": "./src/*",
-    "#/shared/narrow/*": "./src/features/game/*"
+    "#src/*": "./src/*",
+    "#src/shared/narrow/*": "./src/features/game/*"
   }
 }

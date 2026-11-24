@@ -2,9 +2,9 @@
   "name": "@mono/api",
   "private": true,
   "imports": {
-    "#/*": {
+    "#src/*": {
       "types": "./src/*"
     },
-    "#src/*": "./src/*"
+    "#/*": "./src/*"
   }
 }
