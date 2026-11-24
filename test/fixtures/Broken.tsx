@@ -1,7 +1,7 @@
 // This code breaks each typescript.json and solid.json rule that configs.test.ts lists, and the test expects every one
 // of them reported. Long.ts breaks max-lines, which judges a whole file.
 import "./register";
-import { createSignal, Show } from "solid-js";
+import { createDeferred, createSignal, Show } from "solid-js";
 import tool from "./utils/tool";
 // @ts-ignore
 let count: any = 1;
@@ -140,5 +140,15 @@ export function Labels(props: { on: boolean }) {
         <input type="radio" />
       </label>
     </>
+  );
+}
+export const deferred = createDeferred(shared);
+export function Stale() {
+  const current = shared();
+  const onClick = () => console.info(current);
+  return (
+    <button type="button" onClick={onClick}>
+      Log
+    </button>
   );
 }

@@ -1,6 +1,7 @@
 // The problem layers.json names for each case of #/, the aliases and the app pairs, by fixture and file. test/configs.test.ts
 // holds each report to its message, so a case that fails for another reason fails the test.
 const subpath = '#/, which package.json declares as "imports": { "#/*": "./src/*" }';
+const built = '"imports": { "#/*": { "source": "./src/*", "default": "./dist/*" } }';
 const mixedRuntimes =
   "entrypoints/mixed runs on chrome and tauri, as entrypoints/mixed/bad-chrome.ts imports #/infra/chrome/exports, and entrypoints/mixed/bad-web-tauri.ts imports @pair/web/infra/tauri/exports: an entrypoint runs on one runtime, so it imports one platform's adapter and SDK.";
 const forbidden =
@@ -34,12 +35,32 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
     [
       "monorepo",
       "apps/tool/src/shared/bad-subpath-undeclared.ts",
-      'apps/tool/package.json declares no "imports": { "#/*": "./src/*" }, the one form through which #/ names src/.',
+      `apps/tool/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
     ],
     [
       "monorepo",
       "apps/api/src/infra/bad-subpath-target.ts",
-      'apps/api/package.json declares no "imports": { "#/*": "./src/*" }, the one form through which #/ names src/.',
+      `apps/api/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+    ],
+    [
+      "monorepo",
+      "apps/built-default/src/shared/bad-subpath-built-default.ts",
+      `apps/built-default/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+    ],
+    [
+      "monorepo",
+      "apps/built-extra/src/shared/bad-subpath-built-extra.ts",
+      `apps/built-extra/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+    ],
+    [
+      "monorepo",
+      "apps/built-order/src/shared/bad-subpath-built-order.ts",
+      `apps/built-order/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+    ],
+    [
+      "monorepo",
+      "apps/built-source/src/shared/bad-subpath-built-source.ts",
+      `apps/built-source/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
     ],
     [
       "monorepo",

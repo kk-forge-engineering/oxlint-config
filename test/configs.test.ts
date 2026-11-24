@@ -91,6 +91,18 @@ await test("a config that extends the presets reports each broken rule of the fi
   // solid.json forbids innerHTML even with a static HTML string, so the
   // test expects both innerHTML uses in Broken.tsx to be reported.
   assert.equal(run.stdout.match(/solid\(no-innerhtml\)/g)?.length, 2, run.stdout);
+  // These reports hold the eslint-plugin-solid peer floor at 0.20: 0.19 passes createDeferred at module scope and a
+  // value a declared handler captures.
+  assert.match(
+    run.stdout,
+    /Broken\.tsx:\d+:\d+: createDeferred at module scope .* \[Error\/solid\(no-module-scope-reactive-primitive\)\]/,
+    run.stdout,
+  );
+  assert.match(
+    run.stdout,
+    /Broken\.tsx:\d+:\d+: 'current' captures .* \[Error\/solid\(reactivity\)\]/,
+    run.stdout,
+  );
   // typescript.json lets only infra call the console, so a Logger.ts elsewhere is reported.
   assert.doesNotMatch(run.stdout, /infra\/logger\.ts/, run.stdout);
   // A feature's infra/ is infra, and a test is not the program, so neither is reported for the console.

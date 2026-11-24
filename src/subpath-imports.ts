@@ -1,7 +1,9 @@
 // Resolves an import such as `#/features/a/exports` through the `imports` field of the package.json nearest to the
 // importing file. Each app and package of a monorepo so names its own src/. The layers read two keys only,
 // `"#/*": "./src/*"` and `"#tests/*": "./tests/*"` for the test helpers beside src/, so each means the same in every
-// project, and any other form is a problem the rule reports.
+// project, and any other form is a problem the rule reports. A project that Node runs from its build may write `#/*`
+// as `{ "source": "./src/*", "default": "./dist/*" }`: tools that take the "source" condition read src/, and Node
+// reads dist/.
 import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -17,6 +19,41 @@ const forms = [
 /** Returns how package.json writes some of the forms in its `imports`, for the reports. */
 const declarationOf = (declared: readonly { key: string; target: string }[]): string =>
   `"imports": { ${declared.map(({ key, target }) => `"${key}": "${target}"`).join(", ")} }`;
+
+/** The conditions of the `#/*` form for a project that Node runs from its build, in the order Node tries them. */
+const builtForm = [
+  ["source", "./src/*"],
+  ["default", "./dist/*"],
+] as const;
+
+/** How package.json writes the `#/*` form for a project that Node runs from its build, for the reports. */
+const builtDeclaration = `"imports": { "#/*": { ${builtForm.map(([condition, target]) => `"${condition}": "${target}"`).join(", ")} } }`;
+
+/** Returns whether an `imports` value is the `#/*` form for a project that Node runs from its build, keys in order. */
+function isBuiltForm(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const entries = Object.entries(value);
+  return (
+    entries.length === builtForm.length &&
+    entries.every(
+      ([condition, target], at) => condition === builtForm[at][0] && target === builtForm[at][1],
+    )
+  );
+}
+
+/** Returns whether package.json declares a form as the layers read it. */
+const declares = (scope: Scope | undefined, form: (typeof forms)[number]): boolean => {
+  const value = scope?.imports.get(form.key);
+  return value === form.target || (form.key === "#/*" && isBuiltForm(value));
+};
+
+/** Returns the forms a report names for a prefix: `#/` has two, `#tests/` one. */
+const formsOf = (form: (typeof forms)[number]): string =>
+  form.key === "#/*"
+    ? `${declarationOf([form])} or ${builtDeclaration}, the forms`
+    : `${declarationOf([form])}, the one form`;
 
 /** The `#/` form as a report names it, the one way to import from the file's own src/. */
 export const srcSubpathImport = `#/, which package.json declares as ${declarationOf([forms[0]])}`;
@@ -81,7 +118,7 @@ export type SubpathImport = { target: string } | { problem: string } | undefined
 
 /**
  * Returns what a specifier names through the `imports` of the importing file's package.json. A `#/` specifier needs
- * `"#/*": "./src/*"` there, a `#tests/` one `"#tests/*": "./tests/*"`, and a specifier another key of `imports`
+ * `"#/*": "./src/*"` there, or its form for a project that Node runs from its build, a `#tests/` one `"#tests/*": "./tests/*"`, and a specifier another key of `imports`
  * matches takes the wrong form. A `#` specifier that no key matches, such as WXT's `#imports`, is left to the
  * tsconfig.json `paths`.
  */
@@ -111,10 +148,10 @@ export function subpathImport(filename: string, specifier: string): SubpathImpor
         problem: `${specifier} holds a segment Node refuses, such as .., so it names no file of ${form.folder}/.`,
       };
     }
-    return scope?.imports.get(form.key) === form.target
+    return scope && declares(scope, form)
       ? { target: resolve(dirname(scope.file), form.folder, rest) }
       : {
-          problem: `${manifest} declares no ${declarationOf([form])}, the one form through which ${form.prefix} names ${form.folder}/.`,
+          problem: `${manifest} declares no ${formsOf(form)} through which ${form.prefix} names ${form.folder}/.`,
         };
   }
   return undefined;
