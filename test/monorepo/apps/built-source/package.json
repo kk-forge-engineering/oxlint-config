@@ -2,7 +2,7 @@
   "name": "@mono/built-source",
   "private": true,
   "imports": {
-    "#/*": {
+    "#src/*": {
       "source": "./lib/*",
       "default": "./dist/*"
     }

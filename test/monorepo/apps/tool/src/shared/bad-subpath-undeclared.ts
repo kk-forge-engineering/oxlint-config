@@ -1,2 +1,2 @@
-// package.json declares no imports, so #/ names nothing.
-export { tool } from "#/shared/ok-unnamed";
+// package.json declares no imports, so #src/ names nothing.
+export { tool } from "#src/shared/ok-unnamed";

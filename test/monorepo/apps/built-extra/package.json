@@ -2,7 +2,7 @@
   "name": "@mono/built-extra",
   "private": true,
   "imports": {
-    "#/*": {
+    "#src/*": {
       "source": "./src/*",
       "types": "./src/*",
       "default": "./dist/*"

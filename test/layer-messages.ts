@@ -1,9 +1,9 @@
-// The problem layers.json names for each case of #/, the aliases and the app pairs, by fixture and file. test/configs.test.ts
+// The problem layers.json names for each case of #src/, the aliases and the app pairs, by fixture and file. test/configs.test.ts
 // holds each report to its message, so a case that fails for another reason fails the test.
-const subpath = '#/, which package.json declares as "imports": { "#/*": "./src/*" }';
-const built = '"imports": { "#/*": { "source": "./src/*", "default": "./dist/*" } }';
+const subpath = '#src/, which package.json declares as "imports": { "#src/*": "./src/*" }';
+const built = '"imports": { "#src/*": { "source": "./src/*", "default": "./dist/*" } }';
 const mixedRuntimes =
-  "entrypoints/mixed runs on chrome and tauri, as entrypoints/mixed/bad-chrome.ts imports #/infra/chrome/exports, and entrypoints/mixed/bad-web-tauri.ts imports @pair/web/infra/tauri/exports: an entrypoint runs on one runtime, so it imports one platform's adapter and SDK.";
+  "entrypoints/mixed runs on chrome and tauri, as entrypoints/mixed/bad-chrome.ts imports #src/infra/chrome/exports, and entrypoints/mixed/bad-web-tauri.ts imports @pair/web/infra/tauri/exports: an entrypoint runs on one runtime, so it imports one platform's adapter and SDK.";
 const forbidden =
   "An import into another app's source is forbidden: move the code both apps use into a package.";
 
@@ -27,7 +27,17 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
     [
       "layers",
       "src/shared/bad-tsconfig-alias.ts",
-      `Import #paths/shared/log through ${subpath}, since it names this src/ another way.`,
+      `Import paths/shared/log through ${subpath}, since it names this src/ another way.`,
+    ],
+    [
+      "layers",
+      "src/shared/bad-hash-undeclared.ts",
+      "Import #/shared/log through #src/ or #tests/: the layers read no other # name but a platform's SDK, so a file outside src/ and tests/ goes through a relative path or a package.",
+    ],
+    [
+      "layers",
+      "src/shared/bad-hash-paths-alias.ts",
+      "Import #vendor/log through #src/ or #tests/: the layers read no other # name but a platform's SDK, so a file outside src/ and tests/ goes through a relative path or a package.",
     ],
     ["layers", "src/features/a/bad-alias.ts", "features may not import features."],
     ["layers", "src/entities/user/bad-alias.ts", "entities may not import features."],
@@ -35,37 +45,37 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
     [
       "monorepo",
       "apps/tool/src/shared/bad-subpath-undeclared.ts",
-      `apps/tool/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+      `apps/tool/package.json declares no "imports": { "#src/*": "./src/*" } or ${built}, the forms through which #src/ names src/.`,
     ],
     [
       "monorepo",
       "apps/api/src/infra/bad-subpath-target.ts",
-      `apps/api/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+      `apps/api/package.json declares no "imports": { "#src/*": "./src/*" } or ${built}, the forms through which #src/ names src/.`,
     ],
     [
       "monorepo",
       "apps/built-default/src/shared/bad-subpath-built-default.ts",
-      `apps/built-default/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+      `apps/built-default/package.json declares no "imports": { "#src/*": "./src/*" } or ${built}, the forms through which #src/ names src/.`,
     ],
     [
       "monorepo",
       "apps/built-extra/src/shared/bad-subpath-built-extra.ts",
-      `apps/built-extra/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+      `apps/built-extra/package.json declares no "imports": { "#src/*": "./src/*" } or ${built}, the forms through which #src/ names src/.`,
     ],
     [
       "monorepo",
       "apps/built-order/src/shared/bad-subpath-built-order.ts",
-      `apps/built-order/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+      `apps/built-order/package.json declares no "imports": { "#src/*": "./src/*" } or ${built}, the forms through which #src/ names src/.`,
     ],
     [
       "monorepo",
       "apps/built-source/src/shared/bad-subpath-built-source.ts",
-      `apps/built-source/package.json declares no "imports": { "#/*": "./src/*" } or ${built}, the forms through which #/ names src/.`,
+      `apps/built-source/package.json declares no "imports": { "#src/*": "./src/*" } or ${built}, the forms through which #src/ names src/.`,
     ],
     [
       "monorepo",
       "apps/api/src/shared/bad-subpath-key.ts",
-      'Import #src/infra/ok-env through #/ or #tests/, not through #src/*, a key of apps/api/package.json the layers do not read: they read only "imports": { "#/*": "./src/*", "#tests/*": "./tests/*" }.',
+      'Import #/infra/ok-env through #src/ or #tests/, not through #/*, a key of apps/api/package.json the layers do not read: they read only "imports": { "#src/*": "./src/*", "#tests/*": "./tests/*" }.',
     ],
     [
       "app-pairs",
@@ -94,7 +104,7 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
     [
       "layers",
       "src/shared/bad-subpath-dots.ts",
-      "#/../src/shared/log holds a segment Node refuses, such as .., so it names no file of src/.",
+      "#src/../src/shared/log holds a segment Node refuses, such as .., so it names no file of src/.",
     ],
     [
       "app-pairs",
@@ -126,7 +136,7 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
     [
       "monorepo",
       "apps/web/src/shared/bad-subpath-narrow.ts",
-      'Import #/shared/narrow/bad-other-app through #/ or #tests/, not through #/shared/narrow/*, a key of apps/web/package.json the layers do not read: they read only "imports": { "#/*": "./src/*", "#tests/*": "./tests/*" }.',
+      'Import #src/shared/narrow/bad-other-app through #src/ or #tests/, not through #src/shared/narrow/*, a key of apps/web/package.json the layers do not read: they read only "imports": { "#src/*": "./src/*", "#tests/*": "./tests/*" }.',
     ],
     [
       "layers",

@@ -123,6 +123,8 @@ export interface PlatformChecks {
   platformProblem(
     input: PlatformImport & { from: Place; names: readonly string[] | undefined },
   ): string | undefined;
+  /** Returns whether a specifier names a platform's SDK, such as WXT's `#imports`. */
+  isSdk: (specifier: string) => boolean;
   /**
    * Returns, for an entrypoint's file, why it may not make each of `imports`, the file's imports as the editor shows
    * them: an entrypoint runs on one runtime, so it imports the code of one platform. When the entrypoint imports two,
@@ -212,6 +214,7 @@ export function newPlatformChecks(list: readonly Platform[] = platforms): Platfo
     recentPlatforms(module, () => entrypointPlatforms(root, module, new Set()));
 
   return {
+    isSdk: (specifier) => sdkOf(specifier) !== undefined,
     adapterOf,
     globalOf,
     packageAdapterOf,

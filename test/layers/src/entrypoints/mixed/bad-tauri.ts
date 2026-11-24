@@ -1,1 +1,1 @@
-export { invoke } from "#/infra/tauri/exports";
+export { invoke } from "#src/infra/tauri/exports";

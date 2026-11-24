@@ -250,7 +250,7 @@ export function newLayersRule(list: readonly Platform[] = platforms): CreateRule
       };
       /** Reports what `specifierProblem` finds wrong with a specifier, and returns whether it did. */
       const reportSpecifier = (node: ESTree.Node, specifier: string): boolean => {
-        const problem = specifierProblem(context.filename, specifier, root);
+        const problem = specifierProblem(context.filename, specifier, root, checks.isSdk);
         if (problem) {
           report(node, problem);
         }

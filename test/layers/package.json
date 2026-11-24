@@ -1,7 +1,7 @@
 {
   "private": true,
   "imports": {
-    "#/*": "./src/*",
+    "#src/*": "./src/*",
     "#tests/*": "./tests/*"
   }
 }

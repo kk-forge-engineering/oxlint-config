@@ -2,7 +2,7 @@
   "name": "@mono/built-order",
   "private": true,
   "imports": {
-    "#/*": {
+    "#src/*": {
       "default": "./dist/*",
       "source": "./src/*"
     }
