@@ -29,6 +29,11 @@ export const layerMessages: readonly (readonly [fixture: string, file: string, m
       "src/shared/bad-tsconfig-alias.ts",
       `Import #paths/shared/log through ${subpath}, since it names this src/ another way.`,
     ],
+    [
+      "layers",
+      "src/shared/bad-hash-undeclared.ts",
+      "Import #/shared/log through #src/ or #tests/: neither package.json's imports nor tsconfig.json's paths declare it.",
+    ],
     ["layers", "src/features/a/bad-alias.ts", "features may not import features."],
     ["layers", "src/entities/user/bad-alias.ts", "entities may not import features."],
     ["monorepo", "apps/web/src/shared/bad-subpath-layer.ts", "shared may not import entrypoints."],
