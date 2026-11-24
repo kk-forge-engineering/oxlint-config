@@ -69,7 +69,7 @@ Each preset owns one concern, so a package extends only the ones that describe i
 npm install -D @kk-forge/oxlint-config oxlint oxlint-tsgolint
 ```
 
-A Solid package also installs `eslint-plugin-solid` 0.19 or later. The presets need oxlint 1.90 and oxlint-tsgolint 7.0.2005 or later. oxlint resolves `extends` from the config's folder, so give the path:
+A Solid package also installs `eslint-plugin-solid` 0.20 or later. The presets need oxlint 1.90 and oxlint-tsgolint 7.0.2005 or later. oxlint resolves `extends` from the config's folder, so give the path:
 
 ```json
 {
@@ -113,6 +113,12 @@ A SolidStart app's files then look like this:
 - `src/entry-server.tsx` holds `export default startServer()`, which composes the app and returns the server's handler, and `src/entry-client.tsx` holds `startClient()`.
 - `src/app.tsx` and each page route hold `export default` of the component they import. SolidStart's route splitter drops `export { default } from`, so the rule rejects it.
 - The rule rejects an API route's `export function GET()`: the server handler that `startServer()` returns answers such a request before the page render.
+
+## From 13 to 14
+
+- A Solid package raises `eslint-plugin-solid` to 0.20. The peer range no longer takes 0.19.
+- `solid/no-module-scope-reactive-primitive` also reports `createDeferred` at module scope. A component or the composition root creates it, as it does a signal.
+- `solid/reactivity` also reports a value read from a signal at setup that a declared handler captures when the component returns that handler, as in `const current = count(); const onClick = () => log(current); return <button onClick={onClick} />`. Read the signal inside the handler.
 
 ## From 12 to 13
 
