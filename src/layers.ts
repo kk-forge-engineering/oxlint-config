@@ -39,7 +39,7 @@ import {
 } from "./repository.js";
 
 /** The layers whose modules another module reaches only through a surface file. */
-const published = new Set<Layer>(["orchestration", "features", "entities", "shared"]);
+const published = new Set<Layer>(["orchestration", "features", "entities", "infra", "shared"]);
 
 /**
  * Returns the src/ folder beside the innermost tests/ folder of a path that has one beside it, or undefined when the
@@ -156,8 +156,8 @@ function ownModuleProblem(from: Place, to: Place): string | undefined {
 
 /** Returns why an import of module `to` breaks its surface, or undefined when it takes the surface it should. */
 function surfaceProblem(from: Place, to: Place): string | undefined {
-  // A shared module that is one file is its own surface. A folder, shared or not, is reached through its exports.ts.
-  if (to.layer === "shared" && to.file) {
+  // A shared or infra module that is one file is its own surface. A folder is reached through its exports.ts.
+  if ((to.layer === "shared" || to.layer === "infra") && to.file) {
     return undefined;
   }
   if (from.layer !== "entrypoints") {
