@@ -1,0 +1,10 @@
+{
+  "name": "@mono/built",
+  "private": true,
+  "imports": {
+    "#/*": {
+      "source": "./src/*",
+      "default": "./dist/*"
+    }
+  }
+}
